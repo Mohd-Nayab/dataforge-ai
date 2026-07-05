@@ -2,7 +2,7 @@ services:
   - type: web
     name: dataforge-backend
     runtime: node
-    plan: starter
+    plan: free
     repo: https://github.com/Mohd-Nayab/dataforge-ai
     branch: main
     rootDir: backend
@@ -25,7 +25,7 @@ services:
   - type: web
     name: dataforge-python
     runtime: python
-    plan: starter
+    plan: free
     repo: https://github.com/Mohd-Nayab/dataforge-ai
     branch: main
     rootDir: python-service
