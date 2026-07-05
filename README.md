@@ -189,6 +189,20 @@ The backend validates the connection and swaps the active adapter at runtime. To
 - If the database is ever unreachable at startup, the backend logs a warning and falls back to JSON storage so it never crash-loops.
 - Render's free Postgres expires after ~30 days; recreate it or point `DATABASE_URL` at another provider (e.g. Neon) when it lapses.
 
+### MongoDB Atlas (free M0) setup
+
+To demo the MongoDB adapter, create a free cluster and paste its URL into the Admin switcher:
+
+1. Sign up at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas) and create a free **M0** cluster.
+2. **Database Access** → add a database user (username + password).
+3. **Network Access** → add IP `0.0.0.0/0` (allow from anywhere) so Render can connect.
+4. **Connect** → **Drivers** → copy the connection string, e.g.
+   `mongodb+srv://<user>:<pass>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
+5. Replace `<user>`/`<pass>` with your credentials.
+6. In the app: **Admin** → **Database Connection** → choose **MongoDB**, paste the URL, click **Switch Database**.
+
+The adapter uses the `dataforge` database and a `users` collection (created automatically). To make MongoDB the default across restarts, set `DATABASE_TYPE=mongodb` and `DATABASE_URL=<your Atlas URL>` in the backend environment.
+
 ## License
 
 MIT
