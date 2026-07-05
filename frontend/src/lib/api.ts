@@ -85,6 +85,7 @@ export const authApi = {
 
 // ----------------------------------------------------------------- data
 const D = "/data";
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 export const dataApi = {
   async upload(file: File, engine: "pandas" | "polars" | "dask" = "pandas", onProgress?: (pct: number) => void) {
@@ -190,7 +191,7 @@ export const dataApi = {
     return data;
   },
   reportUrl(id: string) {
-    return `/api${D}/datasets/${id}/report/download`;
+    return `${API_BASE}${D}/datasets/${id}/report/download`;
   },
   downloadReport(id: string) {
     const a = document.createElement("a");
@@ -205,7 +206,7 @@ export const dataApi = {
     return data;
   },
   exportUrl(id: string, format: "csv" | "json" | "xlsx") {
-    return `/api${D}/datasets/${id}/export?format=${format}`;
+    return `${API_BASE}${D}/datasets/${id}/export?format=${format}`;
   },
   download(id: string, format: "csv" | "json" | "xlsx") {
     const a = document.createElement("a");
