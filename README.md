@@ -113,11 +113,11 @@ git init
 git add .
 git commit -m "Initial DataForge AI commit"
 git branch -M main
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/dataforge-ai.git
+git remote add origin https://github.com/Mohd-Nayab/dataforge-ai.git
 git push -u origin main
 ```
 
-Replace `YOUR_GITHUB_USERNAME` and `dataforge-ai` with your actual GitHub username and repository name.
+Replace `dataforge-ai` with a different repository name if you prefer.
 
 ### 2. Create the GitHub repo (if not created)
 

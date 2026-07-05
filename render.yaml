@@ -3,7 +3,7 @@ services:
     name: dataforge-backend
     runtime: node
     plan: starter
-    repo: https://github.com/YOUR_GITHUB_USERNAME/dataforge-ai
+    repo: https://github.com/Mohd-Nayab/dataforge-ai
     branch: main
     rootDir: backend
     buildCommand: npm install && npm run build
@@ -26,7 +26,7 @@ services:
     name: dataforge-python
     runtime: python
     plan: starter
-    repo: https://github.com/YOUR_GITHUB_USERNAME/dataforge-ai
+    repo: https://github.com/Mohd-Nayab/dataforge-ai
     branch: main
     rootDir: python-service
     buildCommand: pip install -r requirements.txt
