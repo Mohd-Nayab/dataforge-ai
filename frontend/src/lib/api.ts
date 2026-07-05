@@ -100,6 +100,17 @@ export const dataApi = {
     });
     return data;
   },
+  async saveDatasetMeta(meta: DatasetMeta) {
+    const { data } = await api.post<{ dataset: DatasetMeta }>("/datasets/meta", meta);
+    return data.dataset;
+  },
+  async listDatasetMeta() {
+    const { data } = await api.get<{ datasets: DatasetMeta[] }>("/datasets/meta");
+    return data.datasets;
+  },
+  async deleteDatasetMeta(id: string) {
+    await api.delete(`/datasets/meta/${id}`);
+  },
   async list() {
     const { data } = await api.get<DatasetMeta[]>(`${D}/datasets`);
     return data;

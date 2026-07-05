@@ -24,7 +24,7 @@ export interface DatasetMeta {
   created_at: string;
   updated_at: string;
   owner?: string | null;
-  engine?: "pandas" | "polars" | "dask";
+  engine?: string | null;
 }
 
 export interface ColumnInfo {

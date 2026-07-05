@@ -10,11 +10,14 @@ import { authenticate, requireRole } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
 import { dataProxy } from "./routes/dataProxy.js";
 import { type DatabaseType, createUserRepository } from "./db/index.js";
+import { createDatasetRepository, type DatasetMeta } from "./db/datasets.js";
+import { datasetStore } from "./store/datasets.js";
 import { type Role, toPublic, userStore } from "./store/users.js";
 
 const app = express();
 
 await userStore.init();
+await datasetStore.init();
 
 app.use(helmet());
 app.use(compression());
@@ -85,9 +88,12 @@ app.post(
     }
 
     try {
-      const newRepo = createUserRepository(type, url);
-      await newRepo.init();
-      userStore.setRepo(newRepo);
+      const newUserRepo = createUserRepository(type, url);
+      const newDatasetRepo = createDatasetRepository(type, url);
+      await newUserRepo.init();
+      await newDatasetRepo.init();
+      userStore.setRepo(newUserRepo);
+      datasetStore.setRepo(newDatasetRepo);
       return res.json({ message: "Database switched successfully", type });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to connect to database";
@@ -95,6 +101,26 @@ app.post(
     }
   }
 );
+
+// Dataset metadata endpoints (stored in the configured database, not the Python engine).
+app.post("/api/datasets/meta", authenticate, express.json({ limit: "1mb" }), async (req, res) => {
+  const body = req.body as DatasetMeta;
+  if (!body?.id || !body?.name || !body?.filename) {
+    return res.status(400).json({ error: "Invalid dataset metadata" });
+  }
+  const saved = await datasetStore.saveMeta(body);
+  return res.json({ dataset: saved });
+});
+
+app.get("/api/datasets/meta", authenticate, async (_req, res) => {
+  const datasets = await datasetStore.listMeta();
+  return res.json({ datasets });
+});
+
+app.delete("/api/datasets/meta/:id", authenticate, async (req, res) => {
+  await datasetStore.deleteMeta(req.params.id);
+  return res.json({ message: "Dataset metadata deleted" });
+});
 
 // Data engine proxy — streams everything (incl. multipart uploads) to FastAPI.
 app.use("/api/data", dataProxy);

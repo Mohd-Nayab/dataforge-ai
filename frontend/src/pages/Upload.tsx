@@ -57,6 +57,14 @@ export default function Upload() {
             prev.map((it, idx) => (idx === i ? { ...it, progress: pct } : it))
           )
         );
+        // Also persist the dataset metadata in the active database (Postgres, MongoDB, etc.)
+        await dataApi.saveDatasetMeta({
+          ...meta,
+          engine: meta.engine ?? engine,
+          owner: meta.owner ?? undefined,
+        }).catch(() => {
+          /* fail silently — engine storage is primary */
+        });
         setItems((prev) =>
           prev.map((it, idx) =>
             idx === i ? { ...it, status: "done", progress: 100 } : it
