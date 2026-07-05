@@ -20,7 +20,7 @@ services:
       - key: PYTHON_SERVICE_URL
         value: https://dataforge-python.onrender.com
       - key: CORS_ORIGIN
-        value: https://dataforge-ai.vercel.app
+        value: https://dataforge-ai-five.vercel.app
 
   - type: web
     name: dataforge-python
@@ -35,4 +35,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.15
       - key: CORS_ORIGINS
-        value: https://dataforge-ai.vercel.app,https://dataforge-backend.onrender.com
+        value: https://dataforge-ai-five.vercel.app,https://dataforge-backend-3ixh.onrender.com
