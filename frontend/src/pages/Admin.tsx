@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Database, Shield, UserCog } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PageHeader, Spinner } from "@/components/ui/States";
 import { authApi } from "@/lib/api";
@@ -42,6 +42,14 @@ export default function Admin() {
 
   const [selectedDb, setSelectedDb] = useState<DatabaseType>("json");
   const [dbUrl, setDbUrl] = useState("");
+
+  useEffect(() => {
+    if (dbConfig) setSelectedDb(dbConfig.type);
+  }, [dbConfig]);
+
+  const requiresUrl = selectedDb === "postgres" || selectedDb === "mongodb";
+  const isCurrent = dbConfig?.type === selectedDb;
+  const canSwitch = !isCurrent && (!requiresUrl || dbUrl.trim().length > 0);
 
   const updateRole = useMutation({
     mutationFn: ({ id, role }: { id: string; role: Role }) => authApi.updateRole(id, role),
@@ -114,7 +122,7 @@ export default function Admin() {
         <div className="mt-4 flex items-center gap-3">
           <button
             onClick={() => switchDb.mutate()}
-            disabled={switchDb.isPending}
+            disabled={switchDb.isPending || !canSwitch}
             className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50"
           >
             {switchDb.isPending ? "Switching…" : "Switch Database"}
@@ -126,6 +134,16 @@ export default function Admin() {
           )}
         </div>
 
+        {isCurrent && (
+          <p className="mt-3 text-xs text-slate-500">
+            Already using {DB_LABELS[selectedDb]}. Pick a different database to switch.
+          </p>
+        )}
+        {!isCurrent && requiresUrl && dbUrl.trim().length === 0 && (
+          <p className="mt-3 text-xs text-amber-400">
+            Enter a connection URL to switch to {DB_LABELS[selectedDb]}.
+          </p>
+        )}
         {switchDb.isError && (
           <p className="mt-3 text-xs text-red-400">
             {(switchDb.error as Error)?.message ?? "Failed to switch database"}
