@@ -181,6 +181,14 @@ The backend validates the connection and swaps the active adapter at runtime. To
 
 > Note: switching databases does not migrate existing users. Each backend keeps its own data.
 
+### Managed Postgres on Render (automatic)
+
+`render.yaml` provisions a **free Render Postgres** instance (`dataforge-db`) and injects its connection string into the backend as `DATABASE_URL`, with `DATABASE_TYPE=postgres`. When you deploy the Blueprint, the backend uses Postgres out of the box — no manual URL needed.
+
+- Hosted Postgres connections (Render, Neon, etc.) use SSL automatically; `localhost` connections do not.
+- If the database is ever unreachable at startup, the backend logs a warning and falls back to JSON storage so it never crash-loops.
+- Render's free Postgres expires after ~30 days; recreate it or point `DATABASE_URL` at another provider (e.g. Neon) when it lapses.
+
 ## License
 
 MIT

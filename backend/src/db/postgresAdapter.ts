@@ -13,7 +13,13 @@ export class PostgresUserRepository implements UserRepository {
   private pool: pg.Pool;
 
   constructor(options: PostgresAdapterOptions) {
-    this.pool = new Pool({ connectionString: options.connectionString });
+    const { connectionString } = options;
+    const isLocal =
+      connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+    this.pool = new Pool({
+      connectionString,
+      ssl: isLocal ? undefined : { rejectUnauthorized: false },
+    });
   }
 
   async init(): Promise<void> {

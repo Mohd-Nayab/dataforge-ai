@@ -1,3 +1,4 @@
+import { config } from "../config.js";
 import { createUserRepository } from "../db/index.js";
 import type { PublicUser, Role, User, UserRepository } from "../db/index.js";
 
@@ -7,7 +8,17 @@ class UserStore {
   constructor(private repo: UserRepository) {}
 
   async init() {
-    await this.repo.init();
+    try {
+      await this.repo.init();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `Failed to initialize "${config.databaseType}" database, falling back to JSON storage:`,
+        err instanceof Error ? err.message : err
+      );
+      this.repo = createUserRepository("json");
+      await this.repo.init();
+    }
   }
 
   findByEmail(email: string): Promise<User | undefined> {

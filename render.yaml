@@ -21,12 +21,14 @@ services:
         value: https://dataforge-python.onrender.com
       - key: CORS_ORIGIN
         value: https://dataforge-ai-five.vercel.app
-      # Database: json (default) | sqlite | postgres | mongodb
+      # Database: json | sqlite | postgres | mongodb
       - key: DATABASE_TYPE
-        value: json
-      # Connection string for postgres/mongodb (leave empty for json/sqlite)
+        value: postgres
+      # Auto-populated from the managed Postgres database below.
       - key: DATABASE_URL
-        value: ""
+        fromDatabase:
+          name: dataforge-db
+          property: connectionString
 
   - type: web
     name: dataforge-python
@@ -42,3 +44,8 @@ services:
         value: 3.11.15
       - key: CORS_ORIGINS
         value: https://dataforge-ai-five.vercel.app,https://dataforge-backend-3ixh.onrender.com
+
+databases:
+  - name: dataforge-db
+    databaseName: dataforge
+    plan: free
