@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+*/node_modules/
+python-service/.venv/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Build outputs
+frontend/dist/
+frontend/build/
+backend/dist/
+backend/build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Data / runtime files
+backend/data/
+python-service/data/
+backend/users.json
+*.joblib
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+*.tmp

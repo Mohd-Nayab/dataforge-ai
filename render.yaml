@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: dataforge-backend
+    runtime: node
+    plan: starter
+    repo: https://github.com/YOUR_GITHUB_USERNAME/dataforge-ai
+    branch: main
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: PYTHON_SERVICE_URL
+        value: https://dataforge-python.onrender.com
+      - key: CORS_ORIGIN
+        value: https://dataforge-ai.vercel.app
+
+  - type: web
+    name: dataforge-python
+    runtime: python
+    plan: starter
+    repo: https://github.com/YOUR_GITHUB_USERNAME/dataforge-ai
+    branch: main
+    rootDir: python-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level warning
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.15
+      - key: CORS_ORIGINS
+        value: https://dataforge-ai.vercel.app,https://dataforge-backend.onrender.com

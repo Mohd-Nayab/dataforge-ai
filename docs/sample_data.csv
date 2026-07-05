@@ -1,0 +1,13 @@
+id,name,email,age,city,salary,signup_date
+1,Ada Lovelace,ada@example.com,36,London,82000,2023-01-15
+2,Alan Turing,alan@example.com,41,Manchester,91000,2023-02-20
+3,Grace Hopper, grace@example.com ,45,New York,88000,2023-03-05
+4,Katherine Johnson,katherine@example.com,42,Hampton,79000,2023-01-30
+5,Ada Lovelace,ada@example.com,36,London,82000,2023-01-15
+6,Linus Torvalds,linus@example.com,,Helsinki,95000,2023-04-12
+7,Margaret Hamilton,margaret@example.com,38,Boston,87000,
+8,Dennis Ritchie,not-an-email,44,Murray Hill,90000,2023-05-01
+9,Tim Berners-Lee,tim@example.com,55,London,105000,2023-02-11
+10,Barbara Liskov,barbara@example.com,39,Boston,93000,2023-03-22
+11,John von Neumann,john@example.com,53,Princeton,-5000,2023-06-18
+12,Donald Knuth,donald@example.com,61,Stanford,99000,2023-07-09

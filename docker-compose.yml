@@ -1,0 +1,32 @@
+services:
+  python-service:
+    build: ./python-service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATA_DIR=/app/data
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:4000
+    volumes:
+      - python_data:/app/data
+
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - JWT_SECRET=dev-secret-change-me
+      - PYTHON_SERVICE_URL=http://python-service:8000
+      - CORS_ORIGIN=http://localhost:5173
+    depends_on:
+      - python-service
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  python_data:
