@@ -146,7 +146,10 @@ export default function Admin() {
         )}
         {switchDb.isError && (
           <p className="mt-3 text-xs text-red-400">
-            {(switchDb.error as Error)?.message ?? "Failed to switch database"}
+            {(switchDb.error as { response?: { data?: { error?: string } } })?.response?.data
+              ?.error ??
+              (switchDb.error as Error)?.message ??
+              "Failed to switch database"}
           </p>
         )}
         {switchDb.isSuccess && (

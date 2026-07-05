@@ -12,7 +12,10 @@ export class MongoUserRepository implements UserRepository {
   private dbName = "dataforge";
 
   constructor(options: MongoAdapterOptions) {
-    this.client = new MongoClient(options.connectionString);
+    this.client = new MongoClient(options.connectionString, {
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
+    });
   }
 
   async init(): Promise<void> {
