@@ -2,6 +2,7 @@ import axios from "axios";
 
 import type {
   ChatResponse,
+  DatabaseConfig,
   DatasetMeta,
   ForecastRequest,
   ForecastResponse,
@@ -67,6 +68,17 @@ export const authApi = {
       currentPassword,
       newPassword,
     });
+    return data;
+  },
+  async getDatabaseConfig() {
+    const { data } = await api.get<DatabaseConfig>("/admin/database");
+    return data;
+  },
+  async switchDatabase(type: DatabaseConfig["type"], url: string) {
+    const { data } = await api.post<{ message: string; type: DatabaseConfig["type"] }>(
+      "/admin/database",
+      { type, url }
+    );
     return data;
   },
 };

@@ -9,9 +9,12 @@ import { config } from "./config.js";
 import { authenticate, requireRole } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
 import { dataProxy } from "./routes/dataProxy.js";
+import { type DatabaseType, createUserRepository } from "./db/index.js";
 import { type Role, toPublic, userStore } from "./store/users.js";
 
 const app = express();
+
+await userStore.init();
 
 app.use(helmet());
 app.use(compression());
@@ -40,19 +43,58 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", express.json({ limit: "1mb" }), authRouter);
 
 // Admin: list users and update roles.
-app.get("/api/admin/users", authenticate, requireRole("admin"), (_req, res) => {
-  res.json({ users: userStore.list() });
+app.get("/api/admin/users", authenticate, requireRole("admin"), async (_req, res) => {
+  res.json({ users: await userStore.list() });
 });
 
-app.patch("/api/admin/users/:id/role", authenticate, requireRole("admin"), express.json({ limit: "1mb" }), (req, res) => {
-  const role = req.body.role as Role;
-  if (!role || !["admin", "manager", "user"].includes(role)) {
-    return res.status(400).json({ error: "Invalid role" });
+app.patch(
+  "/api/admin/users/:id/role",
+  authenticate,
+  requireRole("admin"),
+  express.json({ limit: "1mb" }),
+  async (req, res) => {
+    const role = req.body.role as Role;
+    if (!role || !["admin", "manager", "user"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+    const updated = await userStore.updateRole(req.params.id, role);
+    if (!updated) return res.status(404).json({ error: "User not found" });
+    return res.json({ user: updated });
   }
-  const updated = userStore.updateRole(req.params.id, role);
-  if (!updated) return res.status(404).json({ error: "User not found" });
-  return res.json({ user: toPublic(updated) });
+);
+
+// Database configuration endpoints.
+app.get("/api/admin/database", authenticate, requireRole("admin"), (_req, res) => {
+  res.json({
+    type: config.databaseType,
+    url: config.databaseUrl,
+    available: ["json", "sqlite", "postgres", "mongodb"],
+  });
 });
+
+app.post(
+  "/api/admin/database",
+  authenticate,
+  requireRole("admin"),
+  express.json({ limit: "1mb" }),
+  async (req, res) => {
+    const type = req.body.type as DatabaseType;
+    const url = req.body.url as string;
+    if (!type || !["json", "sqlite", "postgres", "mongodb"].includes(type)) {
+      return res.status(400).json({ error: "Invalid database type" });
+    }
+
+    try {
+      const newRepo = createUserRepository(type, url);
+      await newRepo.init();
+      userStore.setRepo(newRepo);
+      return res.json({ message: "Database switched successfully", type });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to connect to database";
+      return res.status(400).json({ error: message });
+    }
+  }
+);
 
 // Data engine proxy — streams everything (incl. multipart uploads) to FastAPI.
 app.use("/api/data", dataProxy);

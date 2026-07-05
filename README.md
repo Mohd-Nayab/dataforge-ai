@@ -160,6 +160,27 @@ Render creates this from `render.yaml` as well (`dataforge-backend`). If you cre
 
 Edit `render.yaml` and `frontend/.env.example` to match the actual Render service names, then push the changes.
 
+## Database options
+
+DataForge supports multiple storage backends for user/auth data through a swappable adapter (`backend/src/db`). Configure the default via environment variables, or switch live from the Admin dashboard.
+
+| Type | `DATABASE_TYPE` | `DATABASE_URL` | Notes |
+| --- | --- | --- | --- |
+| JSON file (default) | `json` | _empty_ | Stored in `DATA_DIR/users.json`. Zero setup. |
+| SQLite | `sqlite` | optional dir path | Local file DB via `better-sqlite3`. |
+| PostgreSQL | `postgres` | `postgresql://user:pass@host:5432/dbname` | Uses `pg`. |
+| MongoDB | `mongodb` | `mongodb+srv://user:pass@cluster.mongodb.net/dbname` | Uses `mongodb`. |
+
+### Switch database from the UI
+
+1. Log in as an **admin** user.
+2. Open the **Admin** page → **Database Connection** card.
+3. Pick a database, enter the connection URL (for Postgres/MongoDB), and click **Switch Database**.
+
+The backend validates the connection and swaps the active adapter at runtime. To make a change permanent across restarts, also set `DATABASE_TYPE` and `DATABASE_URL` in your environment (or `render.yaml`).
+
+> Note: switching databases does not migrate existing users. Each backend keeps its own data.
+
 ## License
 
 MIT

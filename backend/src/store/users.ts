@@ -1,86 +1,55 @@
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { createUserRepository } from "../db/index.js";
+import type { PublicUser, Role, User, UserRepository } from "../db/index.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, "../../data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-
-export type Role = "admin" | "manager" | "user";
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  passwordHash: string;
-  role: Role;
-  createdAt: string;
-}
-
-export type PublicUser = Omit<User, "passwordHash">;
+export type { PublicUser, Role, User } from "../db/index.js";
 
 class UserStore {
-  private users = new Map<string, User>();
+  constructor(private repo: UserRepository) {}
 
-  constructor() {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    this.load();
+  async init() {
+    await this.repo.init();
   }
 
-  private load() {
-    if (!fs.existsSync(USERS_FILE)) return;
-    try {
-      const raw = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8")) as User[];
-      raw.forEach((u) => this.users.set(u.id, u));
-    } catch {
-      /* ignore malformed file */
-    }
+  findByEmail(email: string): Promise<User | undefined> {
+    return this.repo.findByEmail(email);
   }
 
-  persist() {
-    fs.writeFileSync(USERS_FILE, JSON.stringify([...this.users.values()], null, 2));
+  findById(id: string): Promise<User | undefined> {
+    return this.repo.findById(id);
   }
 
-  findByEmail(email: string): User | undefined {
-    return [...this.users.values()].find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
+  create(data: Omit<User, "id" | "createdAt" | "role"> & { role?: Role }): Promise<User> {
+    return this.repo.create(data);
   }
 
-  findById(id: string): User | undefined {
-    return this.users.get(id);
+  list(): Promise<PublicUser[]> {
+    return this.repo.list();
   }
 
-  create(data: Omit<User, "id" | "createdAt" | "role"> & { role?: Role }): User {
-    const isFirstUser = this.users.size === 0;
-    const user: User = {
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
-      role: data.role ?? (isFirstUser ? "admin" : "user"),
-      ...data,
-    };
-    this.users.set(user.id, user);
-    this.persist();
-    return user;
+  updateRole(id: string, role: Role): Promise<PublicUser | undefined> {
+    return this.repo.updateRole(id, role);
   }
 
-  list(): PublicUser[] {
-    return [...this.users.values()].map(toPublic);
+  updateProfile(id: string, name: string): Promise<PublicUser | undefined> {
+    return this.repo.updateProfile(id, name);
   }
 
-  updateRole(id: string, role: Role): User | undefined {
-    const user = this.users.get(id);
-    if (!user) return undefined;
-    user.role = role;
-    this.persist();
-    return user;
+  updatePassword(id: string, passwordHash: string): Promise<PublicUser | undefined> {
+    return this.repo.updatePassword(id, passwordHash);
+  }
+
+  persist(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  setRepo(repo: UserRepository) {
+    this.repo = repo;
   }
 }
+
+export const userStore = new UserStore(createUserRepository());
 
 export function toPublic(user: User): PublicUser {
   const { passwordHash: _ignored, ...rest } = user;
   return rest;
 }
-
-export const userStore = new UserStore();

@@ -1,4 +1,11 @@
 export type Role = "admin" | "manager" | "user";
+export type DatabaseType = "json" | "sqlite" | "postgres" | "mongodb";
+
+export interface DatabaseConfig {
+  type: DatabaseType;
+  url: string;
+  available: DatabaseType[];
+}
 
 export interface User {
   id: string;

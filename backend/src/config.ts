@@ -10,4 +10,7 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
   rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
   rateLimitMax: Number(process.env.RATE_LIMIT_MAX ?? 500),
+  dataDir: process.env.DATA_DIR ?? "./data",
+  databaseType: (process.env.DATABASE_TYPE ?? "json") as "json" | "sqlite" | "postgres" | "mongodb",
+  databaseUrl: process.env.DATABASE_URL ?? "",
 };
