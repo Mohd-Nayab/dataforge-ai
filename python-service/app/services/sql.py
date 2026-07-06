@@ -1,6 +1,7 @@
 """Read-only SQL query engine over a dataset, powered by DuckDB.
 
-The active dataset is exposed as a table named ``data`` (alias ``dataset``).
+The active dataset is exposed as a table named ``data`` (alias ``dataset``),
+and also by its sanitized dataset name (e.g. ``company_records``).
 Only a single read-only statement (SELECT / WITH) is permitted, and DuckDB's
 external access is disabled so queries cannot touch the filesystem or network.
 """
@@ -47,8 +48,19 @@ def _validate(query: str) -> None:
         raise SqlError("Query contains a disallowed (write/DDL) keyword.")
 
 
+def _sanitize_table_name(name: str) -> str:
+    """Convert a dataset name into a valid DuckDB table identifier."""
+    cleaned = re.sub(r"[^0-9a-zA-Z_]", "_", name.strip()).lower()
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+    if not cleaned or cleaned[0].isdigit():
+        cleaned = f"ds_{cleaned or 'dataset'}"
+    return cleaned
+
+
 @cached_query
-def run_query(dataset_id: str, df: pd.DataFrame, query: str, limit: int = 1000) -> dict:
+def run_query(
+    dataset_id: str, df: pd.DataFrame, query: str, limit: int = 1000, dataset_name: str = "dataset"
+) -> dict:
     sql = _normalize(query)
     _validate(sql)
 
@@ -60,6 +72,8 @@ def run_query(dataset_id: str, df: pd.DataFrame, query: str, limit: int = 1000) 
         con.execute("SET enable_external_access=false;")
         con.register("data", df)
         con.register("dataset", df)
+        # Also expose the dataset by its sanitized name so users can write intuitive queries.
+        con.register(_sanitize_table_name(dataset_name), df)
         try:
             result = con.execute(sql).fetch_df()
         except Exception as e:  # noqa: BLE001 - surface a clean message to the client

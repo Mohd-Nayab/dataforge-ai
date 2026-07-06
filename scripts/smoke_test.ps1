@@ -140,6 +140,11 @@ $sql = Invoke-RestMethod "$base/api/data/datasets/$id/sql" -Method Post -Headers
   -ContentType "application/json" -Body (@{ query = "SELECT city_name, COUNT(*) AS count FROM data GROUP BY city_name ORDER BY count DESC"; limit = 100 } | ConvertTo-Json)
 Ok "SQL returned $($sql.row_count) row(s) with columns: $(($sql.columns | ForEach-Object { $_.name }) -join ', ')"
 
+$sampleName = (Get-Item $sample).BaseName.ToLower().Replace(" ", "_")
+$sqlByName = Invoke-RestMethod "$base/api/data/datasets/$id/sql" -Method Post -Headers $headers `
+  -ContentType "application/json" -Body (@{ query = "SELECT COUNT(*) AS count FROM $sampleName"; limit = 100 } | ConvertTo-Json)
+Ok "SQL by dataset name returned $($sqlByName.row_count) row(s)"
+
 Step "SQL query cache"
 $sqlCached = Invoke-RestMethod "$base/api/data/datasets/$id/sql" -Method Post -Headers $headers `
   -ContentType "application/json" -Body (@{ query = "SELECT city_name, COUNT(*) AS count FROM data GROUP BY city_name ORDER BY count DESC"; limit = 100 } | ConvertTo-Json)

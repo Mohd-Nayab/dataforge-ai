@@ -219,7 +219,8 @@ def _safe_filename(name: str) -> str:
 def run_sql(dataset_id: str, req: SqlRequest):
     df = _require_df(dataset_id)
     try:
-        return sql.run_query(dataset_id, df, req.query, req.limit)
+        meta = store.get_meta(dataset_id)
+        return sql.run_query(dataset_id, df, req.query, req.limit, meta.name)
     except SqlError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -65,7 +65,14 @@ export default function SQLWorkspace() {
               spellCheck={false}
             />
             <p className="mt-2 text-xs text-slate-500">
-              Table is exposed as <code className="text-brand-300">data</code> (alias <code className="text-brand-300">dataset</code>). Only read-only SELECT / WITH statements are allowed.
+              Table is exposed as <code className="text-brand-300">data</code> (alias{" "}
+              <code className="text-brand-300">dataset</code>
+              {active.name && (
+                <>
+                  {" "}or <code className="text-brand-300">{active.name.replace(/[^0-9a-zA-Z_]/g, "_").toLowerCase()}</code>
+                </>
+              )}
+              ). Only read-only SELECT / WITH statements are allowed.
             </p>
           </div>
         </div>
