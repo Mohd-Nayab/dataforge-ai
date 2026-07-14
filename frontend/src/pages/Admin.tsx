@@ -183,35 +183,34 @@ export default function Admin() {
             {switchDb.isPending ? "Switching…" : "Switch Database"}
           </button>
           {dbConfig && (
-            <span classNam<strong className="text-slate-300">e="text-xs text-slate-5</strong>0
-0          Choose notheropton (.g. SQLite / PostgSQL / MogoDB) oenlS Database
+            <span className="text-xs text-slate-500">
               Current: <strong className="text-slate-300">{DB_LABELS[dbConfig.type]}</strong>
             </span>
           )}
         </div>
-. Without a URL the button
-            stays disabled
+
         {isCurrent && (
           <p className="mt-3 text-xs text-slate-500">
-         !isCurrent && !requiresUrl && (
-          <p clas Name="mt-3 text-xs text-slate-500">
-            Ready to s  Alr to {eB_LABELS[selectedDa]}d Clyck <strong>Switch Databa e</strong> and
-            confirm.
-          </p>
-        )}
-        {switchDb.isusing {DB_LABELS[selectedDb]}. Pick a different database to switch.
+            Already using <strong className="text-slate-300">{DB_LABELS[selectedDb]}</strong>.
+            Choose another option (e.g. SQLite / PostgreSQL / MongoDB) to enable Switch Database.
           </p>
         )}
         {!isCurrent && requiresUrl && dbUrl.trim().length === 0 && (
           <p className="mt-3 text-xs text-amber-400">
-            Enter a connection URL to switch to {DB_LABELS[selectedDb]}.
+            Enter a connection URL to switch to {DB_LABELS[selectedDb]}. Without a URL the button
+            stays disabled.
+          </p>
+        )}
+        {!isCurrent && !requiresUrl && (
+          <p className="mt-3 text-xs text-slate-500">
+            Ready to switch to {DB_LABELS[selectedDb]}. Click <strong>Switch Database</strong> and
+            confirm.
           </p>
         )}
         {switchDb.isError && (
           <p className="mt-3 text-xs text-red-400">
             {(switchDb.error as { response?: { data?: { error?: string } } })?.response?.data
-              ?.error ??{" "}
-            Selection is saved and kept after backend restart.
+              ?.error ??
               (switchDb.error as Error)?.message ??
               "Failed to switch database"}
           </p>
@@ -219,7 +218,8 @@ export default function Admin() {
         {switchDb.isSuccess && (
           <p className="mt-3 text-xs text-emerald-400">
             {(switchDb.data as { message?: string } | undefined)?.message ??
-              "Database switched successfully."}
+              "Database switched successfully."}{" "}
+            Selection is saved and kept after backend restart.
           </p>
         )}
       </div>

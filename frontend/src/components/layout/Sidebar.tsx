@@ -58,7 +58,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto pr-1">
         {visibleNav.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -79,7 +79,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="glass mt-4 p-3 text-xs text-slate-400">
+      <div className="glass mt-4 shrink-0 p-3 text-xs text-slate-400">
         <p className="font-semibold text-slate-200">Production ready</p>
         <p className="mt-1 leading-relaxed">
           Upload, clean, profile, analyze, SQL, ML, forecast & reports.
