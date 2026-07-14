@@ -9,6 +9,7 @@ import "./adapters/sqlite.js";
 import "./adapters/postgres.js";
 import "./adapters/mysql.js";
 import "./adapters/mongodb.js";
+import "./adapters/chromadb.js";
 
 export { databaseManager, DatabaseManager } from "./core/DatabaseManager.js";
 export { listDescriptors, getDescriptor, isAvailable } from "./core/registry.js";

@@ -204,6 +204,20 @@ To demo the MongoDB adapter, create a free cluster and paste its URL into the Ad
 
 The adapter uses the `dataforge` database and a `users` collection (created automatically). To make MongoDB the default across restarts, set `DATABASE_TYPE=mongodb` and `DATABASE_URL=<your Atlas URL>` in the backend environment.
 
+### ChromaDB setup (local vector DB)
+
+To use the ChromaDB vector adapter locally, start a Chroma server and switch the active database to **ChromaDB**.
+
+1. Run Chroma with Docker:
+   ```bash
+   docker run -d -p 8000:8000 chromadb/chroma:latest
+   ```
+   Or use Python: `pip install chromadb && chroma run --host localhost --port 8000`
+2. In the app: **Admin** → **Database Connection** → choose **ChromaDB**, enter host `localhost` and port `8000`, then click **Switch Database**.
+3. To make ChromaDB the default across restarts, set `DATABASE_TYPE=chromadb` and `DATABASE_URL=http://localhost:8000` in your environment.
+
+Collections are created on demand. Use the **Vector** mode in the query runner to run similarity searches over embeddings.
+
 ## Universal Database Platform Architecture
 
 `backend/src/database` is designed as an adapter-based, multi-engine platform:
@@ -211,15 +225,17 @@ The adapter uses the `dataforge` database and a `users` collection (created auto
 ```
 backend/src/database/
 ├── core/
-│   ├── types.ts          # DatabaseAdapter interface, profile types, capabilities
+│   ├── types.ts          # DatabaseAdapter interface, profile types, capabilities, QueryPlan
 │   ├── crypto.ts         # AES-256-GCM credential encryption
 │   ├── profiles.ts       # Encrypted on-disk profile store (CRUD)
 │   ├── registry.ts       # Adapter registry / plugin catalog
-│   └── DatabaseManager.ts# Pooling, switching, reconnect, unified API
+│   └── DatabaseManager.ts# Pooling, switching, reconnect, unified query API
 ├── adapters/
-│   ├── sqlite.ts
-│   ├── postgres.ts
-│   └── mongodb.ts
+│   ├── sqlite.ts         # Relational (sql + document query plans)
+│   ├── postgres.ts       # Relational (sql + document query plans)
+│   ├── mysql.ts          # Relational (sql + document query plans)
+│   ├── mongodb.ts        # Document (document query plans)
+│   └── chromadb.ts       # Vector (document + vector query plans)
 └── index.ts              # Barrel + adapter registration
 ```
 
@@ -228,29 +244,40 @@ backend/src/database/
 1. **Implement the interface** in `backend/src/database/adapters/<engine>.ts`:
 
 ```typescript
-import type { DatabaseAdapter, ConnectionProfile, QueryResult } from "../core/types";
+import { registerFactory } from "../core/registry.js";
+import {
+  NotSupportedError,
+  type DatabaseAdapter,
+  type ConnectionProfile,
+  type QueryPlan,
+  type QueryResult,
+} from "../core/types.js";
 
-export const myAdapter: DatabaseAdapter = {
-  type: "mysql",
-  capabilities: { family: "relational", sql: true, documents: false, transactions: true, indexes: true, vectorSearch: false },
-  async connect(profile) { /* return connection */ },
-  async disconnect() {},
-  async ping(conn) { return { ok: true, latencyMs: 0 }; },
-  async executeQuery(conn, sql, params) { return { rows: [], rowCount: 0 }; },
-  async find(conn, collection, query) { throw new Error("not implemented"); },
-  async insert(conn, collection, doc) { throw new Error("not implemented"); },
-  async update(conn, collection, query, update) { throw new Error("not implemented"); },
-  async delete(conn, collection, query) { throw new Error("not implemented"); },
-  async listSchemas(conn) { return []; },
-  async transaction(conn, fn) { return fn(conn); },
-};
+class MyAdapter implements DatabaseAdapter {
+  readonly type = "mydb" as const;
+  readonly capabilities = { family: "relational", sql: true, documents: false, transactions: true, indexes: true, vectorSearch: false };
+  async connect() { /* ... */ }
+  async disconnect() { /* ... */ }
+  async test() { return { ok: true, latencyMs: 0, message: "OK" }; }
+  async executeQuery<T>(_sql: string, _params?: unknown[]): Promise<QueryResult<T>> { throw new NotSupportedError(this.type, "executeQuery"); }
+  async find<T>(_target: string, _options?: unknown): Promise<T[]> { return []; }
+  async insert<T>(_target: string, _doc: T | T[]): Promise<number> { return 0; }
+  async update(_target: string, _filter: unknown, _changes: unknown): Promise<number> { return 0; }
+  async delete(_target: string, _filter: unknown): Promise<number> { return 0; }
+  async discoverSchema() { return { objects: [], discoveredAt: new Date().toISOString() }; }
+  async query<T>(plan: QueryPlan): Promise<QueryResult<T>> {
+    if (plan.mode === "sql" && plan.sql) return this.executeQuery<T>(plan.sql, plan.params ?? []);
+    throw new NotSupportedError(this.type, "query");
+  }
+}
+
+registerFactory("mydb", (profile) => new MyAdapter(profile));
 ```
 
 2. **Register it** in `backend/src/database/index.ts`:
 
 ```typescript
-import { myAdapter } from "./adapters/<engine>";
-DatabaseManager.registry.register(myAdapter);
+import "./adapters/<engine>.js"; // module calls registerFactory internally
 ```
 
 3. **(Optional)** If the new engine is the default backend store, add a migration strategy in the legacy `/admin/database` switch route.

@@ -525,7 +525,7 @@ export default function ConnectionManager() {
               >
                 <option value="sql">SQL</option>
                 <option value="document">Document</option>
-                <option value="vector">Vector (future)</option>
+                <option value="vector">Vector</option>
               </select>
             </Field>
             {(queryMode === "document" || queryMode === "vector") && (
