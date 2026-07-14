@@ -136,12 +136,29 @@ databaseRouter.get("/schema", async (_req, res) => {
   }
 });
 
-/** Run a query against the active connection (SQL engines only). */
+/** Run a query against the active connection using the unified QueryPlan. */
+const queryPlanSchema = z.object({
+  mode: z.enum(["sql", "document", "vector"]),
+  target: z.string().optional(),
+  sql: z.string().optional(),
+  params: z.array(z.unknown()).optional(),
+  filter: z.record(z.unknown()).optional(),
+  projection: z.record(z.union([z.literal(0), z.literal(1)])).optional(),
+  limit: z.number().int().positive().optional(),
+  offset: z.number().int().nonnegative().optional(),
+  sort: z.record(z.union([z.literal(1), z.literal(-1)])).optional(),
+  vector: z.array(z.number()).optional(),
+  vectorField: z.string().optional(),
+  topK: z.number().int().positive().optional(),
+});
+
 databaseRouter.post("/query", async (req, res) => {
-  const sql = String(req.body?.sql ?? "").trim();
-  if (!sql) return res.status(400).json({ error: "sql is required" });
+  const parsed = queryPlanSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid query plan" });
+  }
   try {
-    const result = await databaseManager.executeQuery(sql, req.body?.params ?? []);
+    const result = await databaseManager.query(parsed.data);
     return res.json(result);
   } catch (err) {
     return res.status(400).json({ error: err instanceof Error ? err.message : "Query failed" });

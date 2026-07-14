@@ -8,11 +8,13 @@ import mysql from "mysql2/promise";
 import { registerFactory } from "../core/registry.js";
 import {
   AdapterNotConnectedError,
+  NotSupportedError,
   type ConnectionProfile,
   type ConnectionTestResult,
   type DatabaseAdapter,
   type DatabaseCapabilities,
   type FindOptions,
+  type QueryPlan,
   type QueryResult,
   type SchemaObject,
   type SchemaSnapshot,
@@ -113,6 +115,25 @@ export class MysqlAdapter implements DatabaseAdapter {
       fields: fieldNames,
       raw: { rows, fields },
     };
+  }
+
+  async query<T = Record<string, unknown>>(plan: QueryPlan): Promise<QueryResult<T>> {
+    if (plan.mode === "sql") {
+      if (!plan.sql) throw new Error("SQL query plan is missing 'sql' field.");
+      return this.executeQuery<T>(plan.sql, plan.params ?? []);
+    }
+    if (plan.mode === "document") {
+      if (!plan.target) throw new Error("Document query plan is missing 'target' field.");
+      const rows = await this.find<T>(plan.target, {
+        filter: plan.filter,
+        limit: plan.limit,
+        offset: plan.offset,
+        sort: plan.sort,
+        projection: plan.projection,
+      });
+      return { rows, rowCount: rows.length, fields: rows[0] ? Object.keys(rows[0]) : [] };
+    }
+    throw new NotSupportedError(this.type, "query");
   }
 
   async find<T = Record<string, unknown>>(target: string, options: FindOptions = {}): Promise<T[]> {

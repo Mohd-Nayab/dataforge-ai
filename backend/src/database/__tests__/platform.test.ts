@@ -140,4 +140,57 @@ describe("DatabaseManager with SQLite (in-memory)", () => {
     });
     await expect(databaseManager.switchTo(oracle.id)).rejects.toThrow(/not yet implemented/i);
   });
+
+  it("runs a unified SQL QueryPlan", async () => {
+    const { databaseManager } = platform;
+    const profile = profiles.createProfile({
+      name: "Unified Query SQL",
+      type: "sqlite",
+      database: ":memory:",
+    });
+    const adapter = await databaseManager.switchTo(profile.id);
+    await adapter.createTable!("items", [
+      { name: "id", dataType: "INTEGER PRIMARY KEY" },
+      { name: "name", dataType: "TEXT" },
+    ]);
+    await databaseManager.insert("items", [
+      { id: 1, name: "apple" },
+      { id: 2, name: "banana" },
+    ]);
+    const result = await databaseManager.query({ mode: "sql", sql: "SELECT * FROM items WHERE id = ?", params: [1] });
+    expect(result.rows).toEqual([{ id: 1, name: "apple" }]);
+  });
+
+  it("runs a unified document QueryPlan on a relational adapter", async () => {
+    const { databaseManager } = platform;
+    const profile = profiles.createProfile({
+      name: "Unified Query Doc",
+      type: "sqlite",
+      database: ":memory:",
+    });
+    const adapter = await databaseManager.switchTo(profile.id);
+    await adapter.createTable!("items", [
+      { name: "id", dataType: "INTEGER PRIMARY KEY" },
+      { name: "name", dataType: "TEXT" },
+    ]);
+    await databaseManager.insert("items", [
+      { id: 1, name: "apple" },
+      { id: 2, name: "banana" },
+    ]);
+    const result = await databaseManager.query({ mode: "document", target: "items", filter: { name: "banana" } });
+    expect(result.rows).toEqual([{ id: 2, name: "banana" }]);
+  });
+
+  it("throws NotSupportedError for vector QueryPlan on SQLite", async () => {
+    const { databaseManager } = platform;
+    const profile = profiles.createProfile({
+      name: "Vector Refuse",
+      type: "sqlite",
+      database: ":memory:",
+    });
+    await databaseManager.switchTo(profile.id);
+    await expect(
+      databaseManager.query({ mode: "vector", target: "items", vector: [1, 2, 3], vectorField: "embedding", topK: 5 })
+    ).rejects.toThrow(/query.*not supported/i);
+  });
 });

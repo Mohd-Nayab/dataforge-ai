@@ -91,6 +91,31 @@ export interface FindOptions {
   projection?: Record<string, 0 | 1>;
 }
 
+export type QueryMode = "sql" | "document" | "vector";
+
+export interface QueryPlan {
+  mode: QueryMode;
+  /** Table/collection/index name for document or vector modes. */
+  target?: string;
+  /** Raw SQL string for relational engines (mode === "sql"). */
+  sql?: string;
+  /** Positional parameters for raw SQL. */
+  params?: unknown[];
+  /** Document filter (mode === "document"). */
+  filter?: Record<string, unknown>;
+  /** Document field projection (mode === "document"). */
+  projection?: Record<string, 0 | 1>;
+  limit?: number;
+  offset?: number;
+  sort?: Record<string, 1 | -1>;
+  /** Query vector for similarity search (mode === "vector"). */
+  vector?: number[];
+  /** Field containing embeddings for vector search (mode === "vector"). */
+  vectorField?: string;
+  /** Number of nearest neighbors for vector search (mode === "vector"). */
+  topK?: number;
+}
+
 export interface ConnectionTestResult {
   ok: boolean;
   latencyMs: number;
@@ -135,6 +160,13 @@ export interface DatabaseAdapter {
 
   /** Discover schemas / collections / indexes for the Schema Explorer. */
   discoverSchema(): Promise<SchemaSnapshot>;
+
+  // --- Unified query ------------------------------------------------------
+  /**
+   * Dispatch a {@link QueryPlan} to the engine-native implementation.
+   * This is the single entry point higher-level features should use.
+   */
+  query<T = Record<string, unknown>>(plan: QueryPlan): Promise<QueryResult<T>>;
 
   // --- SQL-style ---------------------------------------------------------
   executeQuery<T = Record<string, unknown>>(

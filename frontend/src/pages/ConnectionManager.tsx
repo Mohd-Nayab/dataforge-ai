@@ -78,7 +78,13 @@ export default function ConnectionManager() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<ProfileFormState>(EMPTY_FORM);
+  const [queryMode, setQueryMode] = useState<"sql" | "document" | "vector">("sql");
   const [query, setQuery] = useState("SELECT 1");
+  const [queryTarget, setQueryTarget] = useState("");
+  const [queryFilter, setQueryFilter] = useState("{}");
+  const [queryVector, setQueryVector] = useState("");
+  const [queryVectorField, setQueryVectorField] = useState("embedding");
+  const [queryTopK, setQueryTopK] = useState(5);
 
   const { data: descriptors } = useQuery({
     queryKey: ["database", "supported"],
@@ -154,7 +160,29 @@ export default function ConnectionManager() {
   });
 
   const queryMutation = useMutation({
-    mutationFn: (sql: string) => databaseApi.executeQuery(sql),
+    mutationFn: () => {
+      const plan: import("@/lib/types").QueryPlan = { mode: queryMode };
+      if (queryMode === "sql") {
+        plan.sql = query;
+      } else if (queryMode === "document") {
+        plan.target = queryTarget;
+        try {
+          plan.filter = JSON.parse(queryFilter);
+        } catch {
+          throw new Error("Invalid filter JSON");
+        }
+      } else if (queryMode === "vector") {
+        plan.target = queryTarget;
+        plan.vectorField = queryVectorField;
+        plan.topK = queryTopK;
+        try {
+          plan.vector = JSON.parse(queryVector);
+        } catch {
+          throw new Error("Invalid vector JSON");
+        }
+      }
+      return databaseApi.executeQuery(plan);
+    },
     onError: (e: any) => toast.error(e?.response?.data?.error ?? "Query failed"),
   });
 
@@ -481,21 +509,96 @@ export default function ConnectionManager() {
         </div>
       )}
 
-      {/* Query runner (only for SQL-capable active connections) */}
+      {/* Unified Query Runner */}
       {status?.connected && activeProfile && (
         <div className="card">
           <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-100">
             <RefreshCw className="h-5 w-5 text-brand-400" />
             Query Runner
           </h2>
-          <textarea
-            className="input w-full font-mono text-sm"
-            rows={4}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Mode">
+              <select
+                className="input w-full"
+                value={queryMode}
+                onChange={(e) => setQueryMode(e.target.value as typeof queryMode)}
+              >
+                <option value="sql">SQL</option>
+                <option value="document">Document</option>
+                <option value="vector">Vector (future)</option>
+              </select>
+            </Field>
+            {(queryMode === "document" || queryMode === "vector") && (
+              <Field label="Collection / Index">
+                <input
+                  className="input w-full"
+                  value={queryTarget}
+                  onChange={(e) => setQueryTarget(e.target.value)}
+                  placeholder="users"
+                />
+              </Field>
+            )}
+            {queryMode === "document" && (
+              <Field label="Filter (JSON)">
+                <input
+                  className="input w-full font-mono text-xs"
+                  value={queryFilter}
+                  onChange={(e) => setQueryFilter(e.target.value)}
+                  placeholder='{"status":"active"}'
+                />
+              </Field>
+            )}
+            {queryMode === "vector" && (
+              <>
+                <Field label="Vector Field">
+                  <input
+                    className="input w-full"
+                    value={queryVectorField}
+                    onChange={(e) => setQueryVectorField(e.target.value)}
+                    placeholder="embedding"
+                  />
+                </Field>
+                <Field label="Top K">
+                  <input
+                    type="number"
+                    className="input w-full"
+                    value={queryTopK}
+                    onChange={(e) => setQueryTopK(Number(e.target.value))}
+                    min={1}
+                  />
+                </Field>
+              </>
+            )}
+          </div>
+          {queryMode === "sql" && (
+            <textarea
+              className="input w-full font-mono text-sm"
+              rows={4}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="SELECT * FROM users LIMIT 10"
+            />
+          )}
+          {queryMode === "document" && (
+            <textarea
+              className="input w-full font-mono text-sm"
+              rows={4}
+              value={queryFilter}
+              onChange={(e) => setQueryFilter(e.target.value)}
+              placeholder='{"status":"active"}'
+            />
+          )}
+          {queryMode === "vector" && (
+            <textarea
+              className="input w-full font-mono text-sm"
+              rows={4}
+              value={queryVector}
+              onChange={(e) => setQueryVector(e.target.value)}
+              placeholder="[0.1, 0.2, 0.3]"
+            />
+          )}
           <button
-            onClick={() => queryMutation.mutate(query)}
+            onClick={() => queryMutation.mutate()}
             disabled={queryMutation.isPending}
             className="btn-primary mt-3"
           >

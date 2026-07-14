@@ -460,3 +460,20 @@ export interface QueryResult<T = Record<string, unknown>> {
   fields?: string[];
   raw?: unknown;
 }
+
+export type QueryMode = "sql" | "document" | "vector";
+
+export interface QueryPlan {
+  mode: QueryMode;
+  target?: string;
+  sql?: string;
+  params?: unknown[];
+  filter?: Record<string, unknown>;
+  projection?: Record<string, 0 | 1>;
+  limit?: number;
+  offset?: number;
+  sort?: Record<string, 1 | -1>;
+  vector?: number[];
+  vectorField?: string;
+  topK?: number;
+}

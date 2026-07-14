@@ -14,6 +14,7 @@ import {
   type DatabaseAdapter,
   type DatabaseCapabilities,
   type FindOptions,
+  type QueryPlan,
   type QueryResult,
   type SchemaObject,
   type SchemaSnapshot,
@@ -86,6 +87,24 @@ export class MongoAdapter implements DatabaseAdapter {
 
   async executeQuery<T = Record<string, unknown>>(): Promise<QueryResult<T>> {
     throw new NotSupportedError(this.type, "executeQuery (use find/insert/update/delete)");
+  }
+
+  async query<T = Record<string, unknown>>(plan: QueryPlan): Promise<QueryResult<T>> {
+    if (plan.mode === "document") {
+      if (!plan.target) throw new Error("Document query plan is missing 'target' field.");
+      const rows = await this.find<T>(plan.target, {
+        filter: plan.filter,
+        limit: plan.limit,
+        offset: plan.offset,
+        sort: plan.sort,
+        projection: plan.projection,
+      });
+      return { rows, rowCount: rows.length, fields: rows[0] ? Object.keys(rows[0]) : [] };
+    }
+    if (plan.mode === "sql") {
+      throw new NotSupportedError(this.type, "sql query");
+    }
+    throw new NotSupportedError(this.type, "query");
   }
 
   async find<T = Record<string, unknown>>(target: string, options: FindOptions = {}): Promise<T[]> {

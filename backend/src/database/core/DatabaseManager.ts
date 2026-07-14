@@ -20,6 +20,7 @@ import type {
   ConnectionTestResult,
   DatabaseAdapter,
   FindOptions,
+  QueryPlan,
   QueryResult,
   SchemaSnapshot,
   SupportedDatabase,
@@ -194,6 +195,9 @@ export class DatabaseManager {
   }
 
   // --- Engine-agnostic passthrough (used by cleaning/analytics/AI) --------
+  async query<T = Record<string, unknown>>(plan: QueryPlan): Promise<QueryResult<T>> {
+    return (await this.active()).query<T>(plan);
+  }
   async executeQuery<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<QueryResult<T>> {
     return (await this.active()).executeQuery<T>(sql, params);
   }

@@ -26,6 +26,7 @@ import type {
   OverviewResponse,
   PreviewResponse,
   ProfileResponse,
+  QueryPlan,
   QueryResult,
   ReportResponse,
   SchemaSnapshot,
@@ -192,8 +193,8 @@ export const databaseApi = {
     const { data } = await api.get<SchemaSnapshot>("/database/schema");
     return data;
   },
-  async executeQuery<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<QueryResult<T>> {
-    const { data } = await api.post<QueryResult<T>>("/database/query", { sql, params });
+  async executeQuery<T = Record<string, unknown>>(plan: QueryPlan): Promise<QueryResult<T>> {
+    const { data } = await api.post<QueryResult<T>>("/database/query", plan);
     return data;
   },
 };
