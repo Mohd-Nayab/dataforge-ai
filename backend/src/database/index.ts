@@ -7,6 +7,7 @@
  */
 import "./adapters/sqlite.js";
 import "./adapters/postgres.js";
+import "./adapters/mysql.js";
 import "./adapters/mongodb.js";
 
 export { databaseManager, DatabaseManager } from "./core/DatabaseManager.js";
