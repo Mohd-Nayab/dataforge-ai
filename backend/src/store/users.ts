@@ -37,6 +37,14 @@ class UserStore {
     return this.repo.list();
   }
 
+  listAll(): Promise<User[]> {
+    return this.repo.listAll();
+  }
+
+  upsert(user: User): Promise<User> {
+    return this.repo.upsert(user);
+  }
+
   updateRole(id: string, role: Role): Promise<PublicUser | undefined> {
     return this.repo.updateRole(id, role);
   }

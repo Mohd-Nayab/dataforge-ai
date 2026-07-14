@@ -24,7 +24,9 @@ export class JsonUserRepository implements UserRepository {
   private load() {
     if (!fs.existsSync(this.filePath)) return;
     try {
-      const raw = JSON.parse(fs.readFileSync(this.filePath, "utf-8")) as User[];
+      const text = fs.readFileSync(this.filePath, "utf-8").replace(/^\uFEFF/, "");
+      const raw = JSON.parse(text) as User[];
+      this.users.clear();
       raw.forEach((u) => this.users.set(u.id, u));
     } catch {
       /* ignore malformed file */
@@ -60,6 +62,24 @@ export class JsonUserRepository implements UserRepository {
 
   async list(): Promise<PublicUser[]> {
     return [...this.users.values()].map(toPublic);
+  }
+
+  async listAll(): Promise<User[]> {
+    return [...this.users.values()].map((u) => ({ ...u }));
+  }
+
+  async upsert(user: User): Promise<User> {
+    const email = user.email.toLowerCase();
+    // Drop any other record with the same email but different id.
+    for (const [id, existing] of this.users) {
+      if (existing.email.toLowerCase() === email && id !== user.id) {
+        this.users.delete(id);
+      }
+    }
+    const next: User = { ...user, email };
+    this.users.set(user.id, next);
+    this.persist();
+    return next;
   }
 
   async updateRole(id: string, role: Role): Promise<PublicUser | undefined> {

@@ -8,7 +8,14 @@ interface DatasetState {
 }
 
 export const useDataset = create<DatasetState>((set) => ({
-  active: JSON.parse(localStorage.getItem("df_active") ?? "null"),
+  active: (() => {
+    try {
+      return JSON.parse(localStorage.getItem("df_active") ?? "null");
+    } catch {
+      localStorage.removeItem("df_active");
+      return null;
+    }
+  })(),
   setActive: (d) => {
     if (d) localStorage.setItem("df_active", JSON.stringify(d));
     else localStorage.removeItem("df_active");

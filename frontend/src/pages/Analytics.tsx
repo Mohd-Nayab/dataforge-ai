@@ -21,14 +21,21 @@ const COLORS = ["#6366f1", "#a855f7", "#ec4899", "#f59e0b", "#10b981", "#06b6d4"
 export default function Analytics() {
   const { active } = useDataset();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["overview", active?.id],
     queryFn: () => dataApi.overview(active!.id),
     enabled: !!active,
   });
 
   if (!active) return <NoDataset />;
-  if (isLoading || !data) return <Spinner label="Crunching analytics…" />;
+  if (isLoading) return <Spinner label="Crunching analytics…" />;
+  if (isError || !data)
+    return (
+      <div className="glass py-20 text-center">
+        <p className="text-lg font-semibold text-rose-400">Failed to load analytics</p>
+        <p className="mt-1 text-sm text-slate-400">Try refreshing the page.</p>
+      </div>
+    );
 
   const { kpis, histogram, category_breakdown, correlation } = data;
 

@@ -15,6 +15,7 @@ import { NoDataset, PageHeader, Spinner } from "@/components/ui/States";
 import { dataApi } from "@/lib/api";
 import type { ColumnInfo, ForecastPoint, ForecastResponse } from "@/lib/types";
 import { useDataset } from "@/store/dataset";
+import toast from "react-hot-toast";
 
 const METHODS = [
   { value: "linear", label: "Linear trend" },
@@ -30,7 +31,7 @@ export default function Forecast() {
   const [horizon, setHorizon] = useState(7);
   const [result, setResult] = useState<ForecastResponse | null>(null);
 
-  const { data: columns } = useQuery({
+  const { data: columns, isLoading, isError } = useQuery({
     queryKey: ["preview", active?.id, "columns"],
     queryFn: () => dataApi.preview(active!.id, { page: 1, page_size: 1 }).then((r) => r.columns),
     enabled: !!active,
@@ -45,19 +46,30 @@ export default function Forecast() {
         horizon,
       }),
     onSuccess: (res) => setResult(res),
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.detail ?? "Forecast failed");
+      setResult(null);
+    },
   });
 
-  if (!active) return <NoDataset />;
-  if (!columns) return <Spinner label="Loading columns…" />;
-
-  const dateColumns = columns.filter((c) => c.dtype === "datetime" || /date|time/i.test(c.name));
-  const numericColumns = columns.filter((c) => c.dtype === "number");
+  const dateColumns = (columns ?? []).filter((c) => c.dtype === "datetime" || /date|time/i.test(c.name));
+  const numericColumns = (columns ?? []).filter((c) => c.dtype === "number");
 
   useEffect(() => {
     if (!dateCol && dateColumns.length === 1) {
       setDateCol(dateColumns[0].name);
     }
   }, [dateCol, dateColumns]);
+
+  if (!active) return <NoDataset />;
+  if (isLoading) return <Spinner label="Loading columns…" />;
+  if (isError || !columns)
+    return (
+      <div className="glass py-20 text-center">
+        <p className="text-lg font-semibold text-rose-400">Failed to load columns</p>
+        <p className="mt-1 text-sm text-slate-400">Try selecting a dataset first.</p>
+      </div>
+    );
 
   const chartData = result
     ? [

@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import jwt, { type SignOptions } from "jsonwebtoken";
 
 import { config } from "../config.js";
-import type { Role } from "../store/users.js";
+import { userStore, type Role } from "../store/users.js";
 
 export interface AuthPayload {
   id: string;
@@ -24,14 +24,20 @@ export function signToken(payload: AuthPayload): string {
   return jwt.sign(payload, config.jwtSecret, options);
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Missing or invalid Authorization header" });
   }
   const token = header.slice("Bearer ".length);
   try {
-    req.user = jwt.verify(token, config.jwtSecret) as AuthPayload;
+    const payload = jwt.verify(token, config.jwtSecret) as AuthPayload;
+    // Prefer live role/email from DB so admin promotions apply without re-login.
+    const live = await userStore.findById(payload.id);
+    if (!live) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+    req.user = { id: live.id, email: live.email, role: live.role };
     next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });

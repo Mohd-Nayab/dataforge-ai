@@ -49,21 +49,21 @@ Ok "profile name updated to $($profile.user.name)"
 
 # 3. Upload (multipart via curl.exe to avoid PS quoting issues)
 Step "Upload sample_data.csv"
-$uploadJson = & curl.exe -s -X POST "$base/api/data/datasets/upload" -F "file=@$sample"
+$uploadJson = & curl.exe -s -X POST "$base/api/data/datasets/upload" -H "Authorization: Bearer $token" -F "file=@$sample"
 $ds = $uploadJson | ConvertFrom-Json
 Ok "dataset id=$($ds.id)  rows=$($ds.rows)  cols=$($ds.columns) engine=$($ds.engine)"
 $id = $ds.id
 
 # 3b. Upload with Polars engine
 Step "Upload sample_data.csv with Polars engine"
-$uploadJsonPolars = & curl.exe -s -X POST "$base/api/data/datasets/upload" -F "file=@$sample" -F "engine=polars"
+$uploadJsonPolars = & curl.exe -s -X POST "$base/api/data/datasets/upload" -H "Authorization: Bearer $token" -F "file=@$sample" -F "engine=polars"
 $dsPolars = $uploadJsonPolars | ConvertFrom-Json
 Ok "polars dataset id=$($dsPolars.id)  rows=$($dsPolars.rows)  cols=$($dsPolars.columns) engine=$($dsPolars.engine)"
 $polarsId = $dsPolars.id
 
 # 3c. Upload with Dask engine
 Step "Upload sample_data.csv with Dask engine"
-$uploadJsonDask = & curl.exe -s -X POST "$base/api/data/datasets/upload" -F "file=@$sample" -F "engine=dask"
+$uploadJsonDask = & curl.exe -s -X POST "$base/api/data/datasets/upload" -H "Authorization: Bearer $token" -F "file=@$sample" -F "engine=dask"
 $dsDask = $uploadJsonDask | ConvertFrom-Json
 Ok "dask dataset id=$($dsDask.id)  rows=$($dsDask.rows)  cols=$($dsDask.columns) engine=$($dsDask.engine)"
 $daskId = $dsDask.id
@@ -115,7 +115,7 @@ Ok "profiled $($prof.columns_detail.Count) columns; missing=$($prof.missing_pct)
 # 10. Export in every format
 Step "Export (csv / json / xlsx)"
 foreach ($fmt in @("csv", "json", "xlsx")) {
-  $code = & curl.exe -s -o NUL -w "%{http_code}" "$base/api/data/datasets/$id/export?format=$fmt"
+  $code = & curl.exe -s -o NUL -w "%{http_code}" -H "Authorization: Bearer $token" "$base/api/data/datasets/$id/export?format=$fmt"
   if ($code -ne "200") { throw "Export $fmt failed with HTTP $code" }
   Ok "export $fmt -> HTTP $code"
 }

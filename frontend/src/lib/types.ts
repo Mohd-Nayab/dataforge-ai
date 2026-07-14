@@ -66,11 +66,120 @@ export interface ProfileResponse {
   columns_detail: ColumnStat[];
 }
 
+export interface QualityScores {
+  completeness: number;
+  consistency: number;
+  validity: number;
+  accuracy: number;
+  uniqueness: number;
+  integrity: number;
+  overall: number;
+}
+
+export interface EnterpriseColumnStat extends ColumnStat {
+  pandas_dtype: string;
+  semantic_type: string;
+  semantic_confidence: number;
+  duplicate_count: number;
+  uniqueness_ratio: number;
+  entropy?: number | null;
+  sentinel_missing_pct: number;
+  date_parse_ratio?: number;
+  variance?: number | null;
+  mode?: number | unknown;
+  outlier_count_zscore?: number;
+  pattern_signature?: string;
+  top_pct?: number;
+  min_length?: number;
+  max_length?: number;
+  mean_length?: number;
+}
+
+export interface EnterpriseProfileResponse extends ProfileResponse {
+  total_cells: number;
+  duplicate_pct: number;
+  memory_mb: number;
+  quality_scores: QualityScores;
+  columns_detail: EnterpriseColumnStat[];
+  correlation_matrix: Record<string, Record<string, number>>;
+  sample_size: number;
+  generated_at: string;
+}
+
 export interface ValidationIssue {
   rule: string;
   column?: string;
   severity: "info" | "warning" | "error" | "success";
   message: string;
+}
+
+export interface AuditEntry {
+  timestamp: string;
+  column: string;
+  row_index: number;
+  old_value: unknown;
+  new_value: unknown;
+  method: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface SmartCleanResult {
+  summary: string;
+  rows_before: number;
+  rows_after: number;
+  cells_changed: number;
+  halted: boolean;
+  halt_reason: string;
+  audit_log: AuditEntry[];
+  meta?: DatasetMeta;
+}
+
+export interface ValidationIssueDetail {
+  rule: string;
+  column: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  count?: number;
+  percentage?: number;
+}
+
+export interface EnterpriseValidationReport {
+  total_issues: number;
+  issues: ValidationIssueDetail[];
+  column_reports: Record<string, {
+    issues: ValidationIssueDetail[];
+    issue_count: number;
+    missing: number;
+    missing_pct: number;
+  }>;
+  overall_quality: number;
+}
+
+export interface FuzzyDuplicateGroup {
+  row_indices: number[];
+  similarity_score: number;
+  key_columns: string[];
+  suggested_action: string;
+}
+
+export interface FuzzyDuplicateResult {
+  groups: FuzzyDuplicateGroup[];
+  total_potential_duplicates: number;
+  summary: string;
+}
+
+export interface OutlierColumnReport {
+  iqr: { count: number; bounds: [number, number] | null };
+  zscore: { count: number; threshold: number };
+  modified_zscore: { count: number; threshold: number };
+  total_unique_outliers: number;
+}
+
+export interface OutlierReportResponse {
+  column_reports: Record<string, OutlierColumnReport>;
+  total_outliers: number;
+  summary: string;
 }
 
 export interface OverviewResponse {
@@ -202,4 +311,58 @@ export interface ForecastResponse {
   horizon: number;
   historical: ForecastPoint[];
   forecast: ForecastPoint[];
+}
+
+export interface InsightItem {
+  id: string;
+  severity: "info" | "warning" | "error";
+  title: string;
+  detail: string;
+  metric?: Record<string, unknown>;
+}
+
+export interface InsightsResponse {
+  summary: string;
+  insight_count: number;
+  insights: InsightItem[];
+}
+
+export interface JoinRequest {
+  right_id: string;
+  left_on: string;
+  right_on: string;
+  how?: "inner" | "left" | "right" | "outer";
+  suffixes?: string[];
+  name?: string;
+}
+
+export interface JoinResponse {
+  meta: DatasetMeta;
+  message: string;
+  how: string;
+  left_on: string;
+  right_on: string;
+  left_rows: number;
+  right_rows: number;
+  result_rows: number;
+  sample: Record<string, unknown>[];
+}
+
+export interface ClusterCenter {
+  cluster: number;
+  size: number;
+  means: Record<string, number>;
+}
+
+export interface ClusterResponse {
+  n_clusters: number;
+  features: string[];
+  rows_used: number;
+  inertia: number;
+  silhouette: number | null;
+  cluster_sizes: Record<string, number>;
+  centers: ClusterCenter[];
+  applied: boolean;
+  sample_labels: number[];
+  meta?: DatasetMeta;
 }

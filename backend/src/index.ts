@@ -19,6 +19,12 @@ const app = express();
 await userStore.init();
 await datasetStore.init();
 
+if (config.jwtSecret === "change-me-in-production") {
+  console.warn(
+    "\n⚠️  WARNING: JWT_SECRET is using the default insecure value. Set JWT_SECRET in your environment for production.\n"
+  );
+}
+
 app.use(helmet());
 app.use(compression());
 app.use(
@@ -82,19 +88,52 @@ app.post(
   express.json({ limit: "1mb" }),
   async (req, res) => {
     const type = req.body.type as DatabaseType;
-    const url = req.body.url as string;
+    const url = (req.body.url as string) ?? "";
+    const migrate = req.body.migrate !== false; // default: migrate users + dataset meta
     if (!type || !["json", "sqlite", "postgres", "mongodb"].includes(type)) {
       return res.status(400).json({ error: "Invalid database type" });
     }
+    if (type === config.databaseType && (url || "") === (config.databaseUrl || "")) {
+      return res.status(400).json({ error: "Already using this database" });
+    }
 
     try {
+      // Snapshot current data before swapping repositories.
+      const existingUsers = migrate ? await userStore.listAll() : [];
+      const existingMeta = migrate ? await datasetStore.listMeta() : [];
+
       const newUserRepo = createUserRepository(type, url);
       const newDatasetRepo = createDatasetRepository(type, url);
       await newUserRepo.init();
       await newDatasetRepo.init();
+
+      let usersMigrated = 0;
+      let metaMigrated = 0;
+      if (migrate) {
+        for (const user of existingUsers) {
+          await newUserRepo.upsert(user);
+          usersMigrated += 1;
+        }
+        for (const meta of existingMeta) {
+          await newDatasetRepo.saveMeta(meta);
+          metaMigrated += 1;
+        }
+      }
+
       userStore.setRepo(newUserRepo);
       datasetStore.setRepo(newDatasetRepo);
-      return res.json({ message: "Database switched successfully", type });
+      // Keep runtime config in sync so subsequent /admin/database reads are accurate.
+      config.databaseType = type;
+      config.databaseUrl = url ?? "";
+      return res.json({
+        message: migrate
+          ? `Database switched successfully. Migrated ${usersMigrated} user(s) and ${metaMigrated} dataset meta record(s).`
+          : "Database switched successfully without migration.",
+        type,
+        migrated: migrate,
+        usersMigrated,
+        metaMigrated,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to connect to database";
       return res.status(400).json({ error: message });
@@ -123,7 +162,8 @@ app.delete("/api/datasets/meta/:id", authenticate, async (req, res) => {
 });
 
 // Data engine proxy — streams everything (incl. multipart uploads) to FastAPI.
-app.use("/api/data", dataProxy);
+// Auth is enforced here so the Python service doesn't need to repeat it.
+app.use("/api/data", authenticate, dataProxy);
 
 // Global error handler.
 app.use(

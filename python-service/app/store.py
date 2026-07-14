@@ -21,6 +21,7 @@ from .config import DATA_DIR
 
 _META_FILE = DATA_DIR / "datasets.json"
 _MAX_HISTORY = 20
+_MAX_DATASETS = 100
 
 
 def _now() -> str:
@@ -96,6 +97,11 @@ class DatasetStore:
     def create(self, name: str, filename: str, df: pd.DataFrame,
                owner: Optional[str] = None) -> DatasetMeta:
         with self._lock:
+            # Evict oldest dataset if at capacity.
+            if len(self._entries) >= _MAX_DATASETS:
+                oldest_id = min(self._entries, key=lambda k: self._entries[k].meta.created_at)
+                self._evict_dataset(oldest_id)
+
             dataset_id = uuid.uuid4().hex
             meta = DatasetMeta(
                 id=dataset_id,
@@ -155,15 +161,7 @@ class DatasetStore:
     def delete(self, dataset_id: str) -> None:
         with self._lock:
             self._require(dataset_id)
-            entry = self._entries[dataset_id]
-            for model_id in list(entry.models.keys()):
-                self._delete_model_locked(dataset_id, model_id)
-            del self._entries[dataset_id]
-            for p in (self._parquet_path(dataset_id),
-                      self._parquet_path(dataset_id).with_suffix(".pkl")):
-                if p.exists():
-                    p.unlink()
-            self._persist_meta()
+            self._evict_dataset(dataset_id)
 
     def set_model(self, dataset_id: str, model_id: str, model: Any,
                   info: Dict[str, Any]) -> None:
@@ -229,6 +227,23 @@ class DatasetStore:
         if entry is None:
             raise KeyError(dataset_id)
         return entry
+
+    def _evict_dataset(self, dataset_id: str) -> None:
+        """Remove a dataset and all its artifacts from memory and disk."""
+        entry = self._entries.get(dataset_id)
+        if entry is None:
+            return
+        for model_id in list(entry.models.keys()):
+            self._delete_model_locked(dataset_id, model_id)
+        del self._entries[dataset_id]
+        for p in (self._parquet_path(dataset_id),
+                  self._parquet_path(dataset_id).with_suffix(".pkl")):
+            if p.exists():
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+        self._persist_meta()
 
 
 store = DatasetStore()

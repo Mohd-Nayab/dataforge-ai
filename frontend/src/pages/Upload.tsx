@@ -17,12 +17,27 @@ interface UploadItem {
 }
 
 const ACCEPTED = {
-  "text/csv": [".csv"],
+  "text/csv": [".csv", ".tsv", ".psv"],
   "application/vnd.ms-excel": [".xls"],
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+  "application/vnd.oasis.opendocument.spreadsheet": [".ods"],
   "application/json": [".json"],
   "text/plain": [".txt"],
-  "application/octet-stream": [".parquet", ".feather"],
+  "application/xml": [".xml"],
+  "text/xml": [".xml"],
+  "text/html": [".html", ".htm"],
+  "application/octet-stream": [
+    ".parquet", ".feather", ".arrow", ".orc",
+    ".pkl", ".pickle", ".dta", ".sas7bdat", ".sav",
+    ".h5", ".hdf5",
+  ],
+  "application/vnd.apache.parquet": [".parquet"],
+  "application/vnd.apache.arrow.file": [".arrow"],
+  "application/x-pickle": [".pkl", ".pickle"],
+  "application/x-stata": [".dta"],
+  "application/x-sas": [".sas7bdat"],
+  "application/x-spss-sav": [".sav"],
+  "application/x-hdf5": [".h5", ".hdf5"],
 };
 
 export default function Upload() {
@@ -86,18 +101,23 @@ export default function Upload() {
       }
     }
     await queryClient.invalidateQueries({ queryKey: ["datasets"] });
-    const anyDone = items.some((it) => it.status !== "error");
-    if (anyDone) {
-      toast.success("Upload complete");
-      navigate("/preview");
-    }
+    setItems((prev) => {
+      const anyDone = prev.some((it) => it.status === "done");
+      if (anyDone) {
+        toast.success("Upload complete");
+        navigate("/preview");
+      } else if (prev.every((it) => it.status === "error")) {
+        toast.error("All uploads failed");
+      }
+      return prev;
+    });
   }
 
   return (
     <div>
       <PageHeader
         title="Upload Data"
-        subtitle="Drag & drop CSV, Excel, JSON, TXT, Parquet or Feather files."
+        subtitle="CSV, TSV, PSV, Excel, ODS, JSON, XML, HTML, Parquet, Feather, Arrow, ORC, Pickle, Stata, SAS, SPSS, HDF5 & more."
       />
 
       <div

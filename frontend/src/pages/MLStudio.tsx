@@ -25,8 +25,10 @@ export default function MLStudio() {
   const [modelType, setModelType] = useState("");
   const [predictions, setPredictions] = useState<Record<string, unknown>[] | null>(null);
   const [predictModel, setPredictModel] = useState<MLModel | null>(null);
+  const [clusterK, setClusterK] = useState(3);
+  const [clusterFeatures, setClusterFeatures] = useState<string[]>([]);
 
-  const { data: columns } = useQuery({
+  const { data: columns, isLoading: colsLoading, isError: colsError } = useQuery({
     queryKey: ["preview", active?.id, "columns"],
     queryFn: () => dataApi.preview(active!.id, { page: 1, page_size: 1 }).then((r) => r.columns),
     enabled: !!active,
@@ -77,15 +79,49 @@ export default function MLStudio() {
     onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Delete failed"),
   });
 
+  const clusterMut = useMutation({
+    mutationFn: (apply: boolean) =>
+      dataApi.cluster(active!.id, {
+        features: clusterFeatures.length ? clusterFeatures : undefined,
+        n_clusters: clusterK,
+        apply,
+      }),
+    onSuccess: (res) => {
+      if (res.applied && res.meta) {
+        toast.success(`Applied ${res.n_clusters} clusters to dataset`);
+        queryClient.invalidateQueries({ queryKey: ["preview"] });
+        queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      } else {
+        toast.success(`Clustered into ${res.n_clusters} groups`);
+      }
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Clustering failed"),
+  });
+
   const toggleFeature = (col: string) => {
     setFeatures((prev) =>
       prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]
     );
   };
 
+  const toggleClusterFeature = (col: string) => {
+    setClusterFeatures((prev) =>
+      prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]
+    );
+  };
+
+  const numericCols = (columns ?? []).filter((c) => c.dtype === "number");
+
   const allSelected = columns && features.length === columns.length;
 
   if (!active) return <NoDataset message="Pick a dataset to train a model." />;
+  if (colsLoading) return <Spinner label="Loading columns…" />;
+  if (colsError) return (
+    <div className="glass py-20 text-center">
+      <p className="text-lg font-semibold text-rose-400">Failed to load columns</p>
+      <p className="mt-1 text-sm text-slate-400">Try selecting a dataset first.</p>
+    </div>
+  );
 
   return (
     <div>
@@ -292,6 +328,98 @@ export default function MLStudio() {
           </div>
         </div>
       )}
+
+      <div className="card mt-6">
+        <h3 className="mb-4 text-sm font-semibold text-slate-200">K-Means clustering</h3>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">Clusters (k)</label>
+            <input
+              type="number"
+              min={2}
+              max={20}
+              className="input w-full"
+              value={clusterK}
+              onChange={(e) => setClusterK(Number(e.target.value) || 3)}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-slate-400">
+              Numeric features (empty = all numeric)
+            </label>
+            <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto rounded-lg border border-white/10 p-2">
+              {numericCols.map((c) => (
+                <label
+                  key={c.name}
+                  className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-xs ${
+                    clusterFeatures.includes(c.name)
+                      ? "bg-brand-500/20 text-brand-200"
+                      : "bg-white/5 text-slate-400 hover:bg-white/10"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={clusterFeatures.includes(c.name)}
+                    onChange={() => toggleClusterFeature(c.name)}
+                  />
+                  {c.name}
+                </label>
+              ))}
+              {numericCols.length === 0 && (
+                <span className="text-xs text-slate-500">No numeric columns</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            className="btn-ghost"
+            disabled={clusterMut.isPending || numericCols.length === 0}
+            onClick={() => clusterMut.mutate(false)}
+          >
+            Preview clusters
+          </button>
+          <button
+            className="btn-primary"
+            disabled={clusterMut.isPending || numericCols.length === 0}
+            onClick={() => clusterMut.mutate(true)}
+          >
+            Apply cluster labels
+          </button>
+        </div>
+
+        {clusterMut.data && (
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+            <Metric label="k" value={clusterMut.data.n_clusters} />
+            <Metric label="Rows used" value={clusterMut.data.rows_used} />
+            <Metric
+              label="Silhouette"
+              value={
+                clusterMut.data.silhouette == null
+                  ? "—"
+                  : formatMetric(clusterMut.data.silhouette)
+              }
+            />
+            <Metric label="Inertia" value={formatMetric(clusterMut.data.inertia)} />
+            {clusterMut.data.centers.map((c) => (
+              <div
+                key={c.cluster}
+                className="rounded-lg border border-white/10 bg-white/5 p-3 md:col-span-2"
+              >
+                <div className="text-xs text-slate-500">
+                  Cluster {c.cluster} · size {c.size}
+                </div>
+                <div className="mt-1 text-xs text-slate-300">
+                  {Object.entries(c.means)
+                    .map(([k, v]) => `${k}: ${formatMetric(v)}`)
+                    .join(" · ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

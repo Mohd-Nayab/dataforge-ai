@@ -13,7 +13,7 @@ export default function Datasets() {
   const queryClient = useQueryClient();
   const { active, setActive } = useDataset();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["datasets"],
     queryFn: dataApi.list,
   });
@@ -25,6 +25,7 @@ export default function Datasets() {
       if (active?.id === id) setActive(null);
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
     },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Delete failed"),
   });
 
   function open(d: DatasetMeta) {
@@ -33,6 +34,15 @@ export default function Datasets() {
   }
 
   if (isLoading) return <Spinner label="Loading datasets…" />;
+  if (isError) return (
+    <div>
+      <PageHeader title="Datasets" subtitle="All your uploaded data." />
+      <div className="glass py-12 text-center">
+        <p className="text-lg font-semibold text-rose-400">Failed to load datasets</p>
+        <p className="mt-1 text-sm text-slate-400">Try refreshing the page.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div>

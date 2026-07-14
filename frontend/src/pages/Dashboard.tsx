@@ -4,6 +4,8 @@ import {
   Bot,
   Database,
   FileSpreadsheet,
+  GitMerge,
+  Lightbulb,
   Sparkles,
   Upload as UploadIcon,
   Wand2,
@@ -17,13 +19,15 @@ import { useAuth } from "@/store/auth";
 const QUICK = [
   { to: "/upload", label: "Upload Data", desc: "CSV, Excel, JSON & more", icon: UploadIcon },
   { to: "/cleaning", label: "Cleaning Studio", desc: "One-click data cleaning", icon: Wand2 },
+  { to: "/insights", label: "Auto Insights", desc: "Ranked data findings", icon: Lightbulb },
+  { to: "/join", label: "Dataset Join", desc: "Merge two datasets", icon: GitMerge },
   { to: "/analytics", label: "Analytics", desc: "Charts & correlations", icon: BarChart3 },
   { to: "/chat", label: "AI Assistant", desc: "Ask questions in English", icon: Bot },
 ];
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { data: datasets } = useQuery({
+  const { data: datasets, isError } = useQuery({
     queryKey: ["datasets"],
     queryFn: dataApi.list,
   });
@@ -47,6 +51,12 @@ export default function Dashboard() {
         />
         <KpiCard icon={Sparkles} label="Workspace" value={user?.role ?? "user"} />
       </div>
+
+      {isError && (
+        <div className="mt-4 rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-400">
+          Failed to load datasets. Try refreshing the page.
+        </div>
+      )}
 
       <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-slate-400">
         Quick actions

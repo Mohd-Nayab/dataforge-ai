@@ -14,10 +14,13 @@ frontend/build/
 backend/dist/
 backend/build/
 
-# Environment variables
+# Environment variables (never commit secrets)
 .env
+**/.env
 .env.local
 .env.*.local
+!.env.example
+!**/.env.example
 
 # Data / runtime files
 backend/data/
@@ -25,6 +28,8 @@ python-service/data/
 backend/users.json
 *.joblib
 *.log
+*.sqlite
+*.db
 
 # IDE
 .vscode/
@@ -37,6 +42,10 @@ backend/users.json
 .DS_Store
 Thumbs.db
 
-# Testing
+# Testing / build noise
 coverage/
 *.tmp
+frontend/test-results/
+frontend/playwright-report/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo

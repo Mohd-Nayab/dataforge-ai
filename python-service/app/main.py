@@ -2,34 +2,87 @@
 from __future__ import annotations
 
 import io
+import logging
 import math
 from typing import Optional
 
 import pandas as pd
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from .cache import query_cache
 from .config import CORS_ORIGINS, PREVIEW_PAGE_SIZE
 from .dask_loader import load_dask_dataframe
 from .loader import UnsupportedFileError, load_dataframe
 from .polars_loader import load_polars_dataframe, polars_to_pandas
-from .schemas import AnalyticsRequest, ChatRequest, ForecastRequest, MLPredictRequest, MLTrainRequest, OperationRequest, SqlRequest
-from .services import ai_chat, analytics, cleaning, forecast, ml, profiling, report, sql
+from .schemas import (
+    AnalyticsRequest,
+    ChatRequest,
+    ClusterRequest,
+    ForecastRequest,
+    JoinRequest,
+    MLPredictRequest,
+    MLTrainRequest,
+    OperationRequest,
+    SmartCleanRequest,
+    SqlRequest,
+)
+from .security import FileValidationError, RateLimitMiddleware, SecurityHeadersMiddleware, validate_file
+from .services import (
+    ai_chat,
+    analytics,
+    cleaning,
+    enterprise_profiler,
+    enterprise_report,
+    forecast,
+    insights,
+    join,
+    ml,
+    profiling,
+    report,
+    smart_cleaning,
+    sql,
+)
 from .services.sql import SqlError
 from .store import store
 from .utils import column_dtype, df_to_records
 
 app = FastAPI(title="DataForge AI — Data Engine", version="1.0.0")
 
+# In-memory audit log storage per dataset (last smart-clean result).
+_audit_logs: dict[str, list[dict]] = {}
+_MAX_AUDIT_DATASETS = 50
+
+
+def _store_audit_log(dataset_id: str, log: list[dict]) -> None:
+    """Store audit log with bounded size — evicts oldest entries when limit exceeded."""
+    if len(_audit_logs) >= _MAX_AUDIT_DATASETS and dataset_id not in _audit_logs:
+        # Evict the oldest entry (first inserted key)
+        oldest = next(iter(_audit_logs))
+        del _audit_logs[oldest]
+    _audit_logs[dataset_id] = log
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS + ["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware, window_seconds=60, max_requests=300)
+app.add_middleware(SecurityHeadersMiddleware)
+
+logger = logging.getLogger("dataforge")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 def _require_df(dataset_id: str) -> pd.DataFrame:
@@ -52,6 +105,13 @@ async def upload(
     engine: Optional[str] = Form("pandas"),
 ):
     content = await file.read()
+
+    # Validate file before parsing
+    try:
+        validate_file(file.filename or "upload", content, file.content_type or "")
+    except FileValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     try:
         if engine == "polars":
             df = polars_to_pandas(load_polars_dataframe(file.filename or "upload", content))
@@ -110,7 +170,7 @@ def preview(dataset_id: str,
             page_size: int = Query(PREVIEW_PAGE_SIZE, ge=1, le=500),
             search: Optional[str] = Query(None),
             sort_by: Optional[str] = Query(None),
-            sort_dir: str = Query("asc")):
+            sort_dir: str = Query("asc", pattern="^(asc|desc)$")):
     df = _require_df(dataset_id)
 
     if search:
@@ -145,10 +205,22 @@ def stats(dataset_id: str):
     return profiling.profile(df)
 
 
+@app.get("/datasets/{dataset_id}/profile")
+def profile_detailed(dataset_id: str):
+    df = _require_df(dataset_id)
+    return enterprise_profiler.profile_dataset(df)
+
+
 @app.get("/datasets/{dataset_id}/validate")
 def validate(dataset_id: str):
     df = _require_df(dataset_id)
     return {"issues": profiling.validate(df)}
+
+
+@app.get("/datasets/{dataset_id}/enterprise-validate")
+def enterprise_validate(dataset_id: str):
+    df = _require_df(dataset_id)
+    return smart_cleaning.validate_dataset(df).to_dict()
 
 
 # ---------------------------------------------------------------- cleaning
@@ -171,6 +243,44 @@ def auto_clean(dataset_id: str):
     meta = store.update_df(dataset_id, new_df)
     query_cache.invalidate_dataset(dataset_id)
     return {"log": log, "meta": meta.to_dict()}
+
+
+# ---------------------------------------------------------------- smart cleaning (enterprise)
+@app.post("/datasets/{dataset_id}/smart-clean")
+def smart_clean(dataset_id: str, req: SmartCleanRequest):
+    df = _require_df(dataset_id)
+    result = smart_cleaning.auto_clean_v2(df)
+    _store_audit_log(dataset_id, result.to_dict()["audit_log"])
+    if not req.dry_run and not result.halted:
+        meta = store.update_df(dataset_id, result.df)
+        query_cache.invalidate_dataset(dataset_id)
+        return {**result.to_dict(), "meta": meta.to_dict()}
+    return result.to_dict()
+
+
+@app.get("/datasets/{dataset_id}/audit-log")
+def get_audit_log(dataset_id: str):
+    """Return the audit log for the last smart-clean operation (stored in memory)."""
+    log = _audit_logs.get(dataset_id, [])
+    return {"audit_log": log}
+
+
+@app.delete("/datasets/{dataset_id}/audit-log")
+def clear_audit_log(dataset_id: str):
+    _audit_logs.pop(dataset_id, None)
+    return {"status": "ok"}
+
+
+@app.get("/datasets/{dataset_id}/fuzzy-duplicates")
+def fuzzy_duplicates(dataset_id: str, threshold: float = Query(0.85, ge=0.0, le=1.0)):
+    df = _require_df(dataset_id)
+    return smart_cleaning.detect_fuzzy_duplicates(df, threshold=threshold).to_dict()
+
+
+@app.get("/datasets/{dataset_id}/outlier-report")
+def outlier_report(dataset_id: str):
+    df = _require_df(dataset_id)
+    return smart_cleaning.outlier_report(df).to_dict()
 
 
 @app.get("/operations")
@@ -232,7 +342,7 @@ def cache_stats():
 
 # ---------------------------------------------------------------- export
 @app.get("/datasets/{dataset_id}/export")
-def export_dataset(dataset_id: str, format: str = Query("csv")):
+def export_dataset(dataset_id: str, format: str = Query("csv", pattern="^(csv|json|xlsx|excel)$")):
     df = _require_df(dataset_id)
     base = _safe_filename(store.get_meta(dataset_id).name)
     fmt = format.lower()
@@ -335,6 +445,39 @@ def download_report(dataset_id: str):
     )
 
 
+# ----------------------------------------------------------- enterprise report
+@app.get("/datasets/{dataset_id}/enterprise-report")
+def get_enterprise_report(dataset_id: str):
+    df = _require_df(dataset_id)
+    meta = store.get_meta(dataset_id).to_dict()
+    audit_log = _audit_logs.get(dataset_id, [])
+    return enterprise_report.build_enterprise_report(df, meta, audit_log)
+
+
+@app.get("/datasets/{dataset_id}/enterprise-report/download")
+def download_enterprise_report(dataset_id: str, format: str = Query("html", pattern="^(html|xlsx)$")):
+    df = _require_df(dataset_id)
+    meta = store.get_meta(dataset_id).to_dict()
+    audit_log = _audit_logs.get(dataset_id, [])
+    base = _safe_filename(meta.get("name") or "dataset")
+    rpt = enterprise_report.build_enterprise_report(df, meta, audit_log)
+
+    if format.lower() == "xlsx":
+        payload = enterprise_report.export_excel_multi_sheet(df, meta, audit_log, report=rpt)
+        return StreamingResponse(
+            io.BytesIO(payload),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{base}_enterprise_report.xlsx"'},
+        )
+    else:
+        payload = enterprise_report.render_enterprise_html(rpt)
+        return StreamingResponse(
+            io.BytesIO(payload.encode("utf-8")),
+            media_type="text/html",
+            headers={"Content-Disposition": f'attachment; filename="{base}_enterprise_report.html"'},
+        )
+
+
 # ------------------------------------------------------------------ forecast
 @app.post("/datasets/{dataset_id}/forecast")
 def run_forecast(dataset_id: str, req: ForecastRequest):
@@ -343,3 +486,58 @@ def run_forecast(dataset_id: str, req: ForecastRequest):
         return forecast.forecast(df, req.date_col, req.target_col, req.method, req.horizon)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ------------------------------------------------------------------ insights
+@app.get("/datasets/{dataset_id}/insights")
+def get_insights(dataset_id: str, max_insights: int = Query(12, ge=1, le=50)):
+    df = _require_df(dataset_id)
+    return insights.generate(df, max_insights=max_insights)
+
+
+# ------------------------------------------------------------------ join
+@app.post("/datasets/{dataset_id}/join")
+def join_datasets(dataset_id: str, req: JoinRequest):
+    _require_df(dataset_id)
+    try:
+        _require_df(req.right_id)
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="Right dataset not found")
+    try:
+        return join.join_datasets(
+            left_id=dataset_id,
+            right_id=req.right_id,
+            left_on=req.left_on,
+            right_on=req.right_on,
+            how=req.how,
+            suffixes=req.suffixes,
+            name=req.name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+
+# ------------------------------------------------------------------ cluster
+@app.post("/datasets/{dataset_id}/ml/cluster")
+def cluster_dataset(dataset_id: str, req: ClusterRequest):
+    df = _require_df(dataset_id)
+    try:
+        result = ml.cluster(
+            df,
+            features=req.features,
+            n_clusters=req.n_clusters,
+            apply=req.apply,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clustering failed: {e}")
+
+    if req.apply and "df" in result:
+        new_df = result.pop("df")
+        meta = store.update_df(dataset_id, new_df)
+        query_cache.invalidate_dataset(dataset_id)
+        result["meta"] = meta.to_dict()
+    return result

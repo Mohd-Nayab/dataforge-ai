@@ -71,6 +71,22 @@ export class MongoUserRepository implements UserRepository {
     return users as PublicUser[];
   }
 
+  async listAll(): Promise<User[]> {
+    const users = await this.collection().find({}).sort({ createdAt: -1 }).toArray();
+    return users as User[];
+  }
+
+  async upsert(user: User): Promise<User> {
+    const email = user.email.toLowerCase();
+    await this.collection().deleteMany({
+      email: { $regex: `^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+      id: { $ne: user.id },
+    });
+    const next: User = { ...user, email };
+    await this.collection().updateOne({ id: user.id }, { $set: next }, { upsert: true });
+    return next;
+  }
+
   async updateRole(id: string, role: Role): Promise<PublicUser | undefined> {
     await this.collection().updateOne({ id }, { $set: { role } });
     const user = await this.findById(id);

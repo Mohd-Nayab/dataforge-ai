@@ -19,7 +19,7 @@ DataForge_AI/
 Everything runs **end-to-end**:
 
 - JWT authentication (register / login) — Node backend. **The first registered user becomes `admin`**, with an Admin Dashboard to list users and change roles, plus a Profile page for every user to update their name and change password
-- File upload (CSV / XLSX / JSON / Parquet / Feather / TXT) — FastAPI engine
+- File upload (CSV / TSV / PSV / Excel / ODS / JSON / XML / HTML / Parquet / Feather / Arrow / ORC / Pickle / Stata / SAS / SPSS / HDF5) — FastAPI engine
 - Excel-like data preview (sorting, search, pagination, column stats)
 - **Cleaning Studio** with real Pandas operations (remove duplicates, drop/fill nulls, trim, case, outlier removal, type casting, encoding, etc.) plus a **column-scope selector** so any operation can target specific columns, and column ops (drop / rename / split / merge / dtype-cast).
 - **Data Profiling** page — per-column dtype, missing %, unique counts, and numeric summaries (min/mean/median/max/std), backed by the `/stats` engine

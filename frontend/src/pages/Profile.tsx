@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Save, User } from "lucide-react";
+import toast from "react-hot-toast";
 
 import { PageHeader, Spinner } from "@/components/ui/States";
 import { authApi } from "@/lib/api";
@@ -21,6 +22,7 @@ export default function Profile() {
       setUser(updated);
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     },
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Failed to update profile"),
   });
 
   const changePassword = useMutation({
@@ -31,15 +33,15 @@ export default function Profile() {
       setConfirmPassword("");
       setPasswordMessage("Password changed successfully");
     },
-    onError: (err: Error) => {
-      setPasswordMessage(err.message || "Failed to change password");
+    onError: (err: any) => {
+      setPasswordMessage(err?.response?.data?.error ?? "Failed to change password");
     },
   });
 
   if (!user) return <Spinner label="Loading profile…" />;
 
   const canChangePassword =
-    newPassword.length >= 6 && newPassword === confirmPassword && currentPassword.length > 0;
+    newPassword.length >= 8 && newPassword === confirmPassword && currentPassword.length > 0;
 
   return (
     <div>
@@ -109,7 +111,7 @@ export default function Profile() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="input w-full"
               />
-              <p className="mt-1 text-xs text-slate-500">Minimum 6 characters</p>
+              <p className="mt-1 text-xs text-slate-500">Minimum 8 characters</p>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-400">Confirm new password</label>

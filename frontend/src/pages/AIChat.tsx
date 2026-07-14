@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Send, User as UserIcon } from "lucide-react";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 import { NoDataset, PageHeader } from "@/components/ui/States";
@@ -29,6 +29,12 @@ export default function AIChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const chat = useMutation({
     mutationFn: (message: string) => dataApi.chat(active!.id, message),
@@ -48,22 +54,33 @@ export default function AIChat() {
             ...prev,
             { role: "assistant", text: `✓ ${result.message}` },
           ]);
-        } catch {
-          /* surface nothing extra */
+        } catch (e: any) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: `✗ Operation failed: ${e?.response?.data?.detail ?? "Unknown error"}` },
+          ]);
         }
       } else if (res.action === "auto_fill") {
-        const result = await dataApi.autoClean(active!.id);
-        setActive(result.meta);
-        queryClient.invalidateQueries({ queryKey: ["preview"] });
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", text: "✓ Filled missing values." },
-        ]);
+        try {
+          const result = await dataApi.autoClean(active!.id);
+          setActive(result.meta);
+          queryClient.invalidateQueries({ queryKey: ["preview"] });
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: "✓ Filled missing values." },
+          ]);
+        } catch (e: any) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", text: `✗ Auto-fill failed: ${e?.response?.data?.detail ?? "Unknown error"}` },
+          ]);
+        }
       }
-      setTimeout(
-        () => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }),
-        50
-      );
+      setTimeout(() => {
+        if (mountedRef.current) {
+          scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+        }
+      }, 50);
     },
     onError: () => toast.error("Assistant unavailable"),
   });

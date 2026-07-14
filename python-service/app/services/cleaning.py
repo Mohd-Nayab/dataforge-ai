@@ -214,6 +214,87 @@ def drop_columns(df: pd.DataFrame, params: dict) -> Result:
     return out, f"Dropped {len(cols)} column(s)."
 
 
+def filter_rows(df: pd.DataFrame, params: dict) -> Result:
+    """Filter rows with a simple column/operator/value rule."""
+    column = params.get("column")
+    op = (params.get("op") or "==").strip()
+    value = params.get("value")
+    if not column or column not in df.columns:
+        raise ValueError("filter_rows requires a valid 'column'.")
+    series = df[column]
+    before = len(df)
+
+    def _coerce(v):
+        if pd.api.types.is_numeric_dtype(series):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return v
+        return v
+
+    rhs = _coerce(value)
+    ops = {
+        "==": series == rhs,
+        "!=": series != rhs,
+        ">": series > rhs,
+        ">=": series >= rhs,
+        "<": series < rhs,
+        "<=": series <= rhs,
+        "contains": series.astype(str).str.contains(str(value), case=False, na=False),
+        "not_contains": ~series.astype(str).str.contains(str(value), case=False, na=False),
+        "is_null": series.isna(),
+        "not_null": series.notna(),
+    }
+    if op not in ops:
+        raise ValueError(f"Unsupported filter op '{op}'. Use: {', '.join(ops)}")
+    out = df[ops[op]].reset_index(drop=True)
+    return out, f"Filtered rows where {column} {op} {value!r}: {before - len(out)} removed, {len(out)} remain."
+
+
+def sample_rows(df: pd.DataFrame, params: dict) -> Result:
+    """Random sample of rows by count or fraction."""
+    n = params.get("n")
+    frac = params.get("frac")
+    seed = int(params.get("seed", 42))
+    before = len(df)
+    if before == 0:
+        return df, "Dataset is empty."
+    if frac is not None:
+        f = float(frac)
+        if not 0 < f <= 1:
+            raise ValueError("frac must be between 0 and 1.")
+        out = df.sample(frac=f, random_state=seed).reset_index(drop=True)
+        return out, f"Sampled {len(out)} of {before} rows (frac={f})."
+    if n is None:
+        n = min(1000, before)
+    n = int(n)
+    if n <= 0:
+        raise ValueError("n must be positive.")
+    out = df.sample(n=min(n, before), random_state=seed).reset_index(drop=True)
+    return out, f"Sampled {len(out)} of {before} rows."
+
+
+def formula_column(df: pd.DataFrame, params: dict) -> Result:
+    """Create a column from a pandas eval expression over existing columns."""
+    expression = (params.get("expression") or "").strip()
+    new_col = (params.get("new") or params.get("column") or "formula_result").strip()
+    if not expression:
+        raise ValueError("formula_column requires 'expression'.")
+    if not new_col:
+        raise ValueError("formula_column requires 'new' column name.")
+    # Block obviously dangerous constructs.
+    banned = ("__", "import", "os.", "sys.", "open(", "eval(", "exec(", "lambda")
+    lowered = expression.lower()
+    if any(b in lowered for b in banned):
+        raise ValueError("Expression contains disallowed tokens.")
+    out = df.copy()
+    try:
+        out[new_col] = out.eval(expression, engine="python")
+    except Exception as e:
+        raise ValueError(f"Invalid expression: {e}") from e
+    return out, f"Created column '{new_col}' from expression."
+
+
 OPERATIONS: Dict[str, Callable[[pd.DataFrame, dict], Result]] = {
     "remove_duplicates": remove_duplicates,
     "drop_nulls": drop_nulls,
@@ -230,6 +311,9 @@ OPERATIONS: Dict[str, Callable[[pd.DataFrame, dict], Result]] = {
     "split_column": split_column,
     "merge_columns": merge_columns,
     "drop_columns": drop_columns,
+    "filter_rows": filter_rows,
+    "sample_rows": sample_rows,
+    "formula_column": formula_column,
 }
 
 

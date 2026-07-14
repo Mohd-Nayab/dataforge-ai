@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Database, Download, FileText, HardDrive, Info, Percent, Rows3, Shield, Table2, XCircle } from "lucide-react";
+import toast from "react-hot-toast";
 
 import { NoDataset, PageHeader, Spinner } from "@/components/ui/States";
 import { dataApi } from "@/lib/api";
@@ -31,14 +32,21 @@ function severityBadge(severity: ReportIssue["severity"]) {
 export default function Report() {
   const { active } = useDataset();
 
-  const { data, isLoading } = useQuery<ReportResponse>({
+  const { data, isLoading, isError } = useQuery<ReportResponse>({
     queryKey: ["report", active?.id],
     queryFn: () => dataApi.getReport(active!.id),
     enabled: !!active,
   });
 
   if (!active) return <NoDataset />;
-  if (isLoading || !data) return <Spinner label="Building report…" />;
+  if (isLoading) return <Spinner label="Building report…" />;
+  if (isError || !data)
+    return (
+      <div className="glass py-20 text-center">
+        <p className="text-lg font-semibold text-rose-400">Failed to build report</p>
+        <p className="mt-1 text-sm text-slate-400">Try refreshing the page.</p>
+      </div>
+    );
 
   const s = data.summary;
 
@@ -46,7 +54,9 @@ export default function Report() {
     <div>
       <PageHeader title="Report Builder" subtitle={data.dataset.name}>
         <button
-          onClick={() => dataApi.downloadReport(active.id)}
+          onClick={() => {
+            dataApi.downloadReport(active.id).catch(() => toast.error("Download failed"));
+          }}
           className="inline-flex items-center rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
         >
           <Download className="mr-2 h-4 w-4" />

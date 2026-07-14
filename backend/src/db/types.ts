@@ -24,6 +24,10 @@ export interface UserRepository {
   findById(id: string): Promise<User | undefined>;
   create(data: CreateUserInput): Promise<User>;
   list(): Promise<PublicUser[]>;
+  /** Full user records including password hashes (admin migration only). */
+  listAll(): Promise<User[]>;
+  /** Insert or replace a full user record, preserving id/role/passwordHash. */
+  upsert(user: User): Promise<User>;
   updateRole(id: string, role: Role): Promise<PublicUser | undefined>;
   updateProfile(id: string, name: string): Promise<PublicUser | undefined>;
   updatePassword(id: string, passwordHash: string): Promise<PublicUser | undefined>;

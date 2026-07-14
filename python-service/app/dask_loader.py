@@ -8,11 +8,8 @@ from __future__ import annotations
 
 import json
 import tempfile
-from pathlib import Path
 
 import dask.dataframe as dd
-
-from .loader import UnsupportedFileError
 
 
 def _temp_path(content: bytes, suffix: str) -> str:
@@ -32,10 +29,23 @@ def load_dask_dataframe(filename: str, content: bytes):
         except Exception:
             return dd.read_csv(path, sep=None, engine="python")
 
+    if name.endswith(".tsv"):
+        path = _temp_path(content, ".tsv")
+        return dd.read_csv(path, sep="\t")
+
+    if name.endswith(".psv"):
+        path = _temp_path(content, ".psv")
+        return dd.read_csv(path, sep="|")
+
     if name.endswith(".xlsx") or name.endswith(".xls"):
         import pandas as pd
         path = _temp_path(content, ".xlsx")
         return dd.from_pandas(pd.read_excel(path), npartitions=1)
+
+    if name.endswith(".ods"):
+        import pandas as pd
+        path = _temp_path(content, ".ods")
+        return dd.from_pandas(pd.read_excel(path, engine="odf"), npartitions=1)
 
     if name.endswith(".json"):
         path = _temp_path(content, ".json")
@@ -51,12 +61,16 @@ def load_dask_dataframe(filename: str, content: bytes):
         path = _temp_path(content, ".parquet")
         return dd.read_parquet(path)
 
-    if name.endswith(".feather"):
+    if name.endswith(".feather") or name.endswith(".arrow"):
         import pandas as pd
         path = _temp_path(content, ".feather")
         return dd.from_pandas(pd.read_feather(path), npartitions=1)
 
-    raise UnsupportedFileError(
-        f"Unsupported file type for '{filename}' with Dask engine. "
-        "Supported: csv, txt, xlsx, xls, json, parquet, feather."
-    )
+    if name.endswith(".orc"):
+        path = _temp_path(content, ".orc")
+        return dd.read_orc(path)
+
+    # Formats not natively supported by dask — fall back to pandas
+    import pandas as pd
+    from .loader import load_dataframe
+    return dd.from_pandas(load_dataframe(filename, content), npartitions=1)

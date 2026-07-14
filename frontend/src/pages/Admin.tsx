@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Database, Shield, UserCog } from "lucide-react";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 import { PageHeader, Spinner } from "@/components/ui/States";
 import { authApi } from "@/lib/api";
@@ -28,7 +29,7 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "admin";
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, isError: usersError } = useQuery({
     queryKey: ["admin", "users"],
     queryFn: () => authApi.listUsers(),
     enabled: isAdmin,
@@ -42,6 +43,7 @@ export default function Admin() {
 
   const [selectedDb, setSelectedDb] = useState<DatabaseType>("json");
   const [dbUrl, setDbUrl] = useState("");
+  const [migrateUsers, setMigrateUsers] = useState(true);
 
   useEffect(() => {
     if (dbConfig) setSelectedDb(dbConfig.type);
@@ -54,14 +56,17 @@ export default function Admin() {
   const updateRole = useMutation({
     mutationFn: ({ id, role }: { id: string; role: Role }) => authApi.updateRole(id, role),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Failed to update role"),
   });
 
   const switchDb = useMutation({
-    mutationFn: () => authApi.switchDatabase(selectedDb, dbUrl),
-    onSuccess: () => {
+    mutationFn: () => authApi.switchDatabase(selectedDb, dbUrl, { migrate: migrateUsers }),
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "database"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast.success(res.message);
     },
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Failed to switch database"),
   });
 
   if (!isAdmin) {
@@ -72,7 +77,14 @@ export default function Admin() {
     );
   }
 
-  if (isLoading || !users) return <Spinner label="Loading users…" />;
+  if (isLoading) return <Spinner label="Loading users…" />;
+  if (usersError || !users) {
+    return (
+      <div className="card mt-6 text-center text-sm text-rose-400">
+        Failed to load users. Try logging out and back in, then refresh.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -119,9 +131,39 @@ export default function Admin() {
           </div>
         </div>
 
+        <label className="mt-4 flex items-start gap-2 text-xs text-slate-300">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={migrateUsers}
+            onChange={(e) => setMigrateUsers(e.target.checked)}
+          />
+          <span>
+            Migrate existing users and dataset metadata into the new database
+            <span className="block text-slate-500">
+              Recommended. Uncheck only if you intentionally want an empty target store.
+            </span>
+          </span>
+        </label>
+
+        {!migrateUsers && !isCurrent && (
+          <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            Warning: switching without migration can leave the target database empty. Existing
+            sessions may fail until users re-register or you switch back.
+          </p>
+        )}
+
         <div className="mt-4 flex items-center gap-3">
           <button
-            onClick={() => switchDb.mutate()}
+            onClick={() => {
+              const target = DB_LABELS[selectedDb];
+              const ok = window.confirm(
+                migrateUsers
+                  ? `Switch to ${target} and migrate users + dataset metadata?`
+                  : `Switch to ${target} WITHOUT migration? The target may be empty and logins can break.`
+              );
+              if (ok) switchDb.mutate();
+            }}
             disabled={switchDb.isPending || !canSwitch}
             className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50"
           >
@@ -153,7 +195,10 @@ export default function Admin() {
           </p>
         )}
         {switchDb.isSuccess && (
-          <p className="mt-3 text-xs text-emerald-400">Database switched successfully.</p>
+          <p className="mt-3 text-xs text-emerald-400">
+            {(switchDb.data as { message?: string } | undefined)?.message ??
+              "Database switched successfully."}
+          </p>
         )}
       </div>
 

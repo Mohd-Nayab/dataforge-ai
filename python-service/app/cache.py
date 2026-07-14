@@ -6,6 +6,7 @@ column transforms, etc.) should invalidate that dataset's cache entries.
 """
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 from functools import wraps
 from typing import Any, Callable
@@ -15,30 +16,35 @@ class _LRUCache:
     def __init__(self, maxsize: int = 256):
         self.maxsize = maxsize
         self._store: OrderedDict[str, Any] = OrderedDict()
+        self._lock = threading.Lock()
 
     def get(self, key: str) -> Any | None:
-        if key not in self._store:
-            return None
-        self._store.move_to_end(key)
-        return self._store[key]
+        with self._lock:
+            if key not in self._store:
+                return None
+            self._store.move_to_end(key)
+            return self._store[key]
 
     def set(self, key: str, value: Any) -> None:
-        self._store[key] = value
-        self._store.move_to_end(key)
-        while len(self._store) > self.maxsize:
-            self._store.popitem(last=False)
+        with self._lock:
+            self._store[key] = value
+            self._store.move_to_end(key)
+            while len(self._store) > self.maxsize:
+                self._store.popitem(last=False)
 
     def invalidate_dataset(self, dataset_id: str) -> int:
-        removed = 0
-        prefix = f"ds:{dataset_id}:"
-        for key in list(self._store.keys()):
-            if key.startswith(prefix):
-                del self._store[key]
-                removed += 1
-        return removed
+        with self._lock:
+            removed = 0
+            prefix = f"ds:{dataset_id}:"
+            for key in list(self._store.keys()):
+                if key.startswith(prefix):
+                    del self._store[key]
+                    removed += 1
+            return removed
 
     def stats(self) -> dict:
-        return {"size": len(self._store), "maxsize": self.maxsize}
+        with self._lock:
+            return {"size": len(self._store), "maxsize": self.maxsize}
 
 
 query_cache = _LRUCache(maxsize=256)

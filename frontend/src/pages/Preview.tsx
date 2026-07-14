@@ -21,7 +21,7 @@ export default function Preview() {
   const [sortBy, setSortBy] = useState<string | undefined>();
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["preview", active?.id, page, search, sortBy, sortDir],
     queryFn: () =>
       dataApi.preview(active!.id, {
@@ -71,6 +71,8 @@ export default function Preview() {
       <div className="glass overflow-hidden">
         {isLoading ? (
           <Spinner label="Loading rows…" />
+        ) : isError ? (
+          <div className="py-12 text-center text-sm text-rose-400">Failed to load data. Try refreshing.</div>
         ) : !data ? (
           <div className="py-12 text-center text-sm text-slate-400">No data</div>
         ) : (

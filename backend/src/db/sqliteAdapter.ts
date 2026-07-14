@@ -93,6 +93,31 @@ export class SqliteUserRepository implements UserRepository {
     return rows.map((r) => this.toPublic(this.toUser(r)));
   }
 
+  async listAll(): Promise<User[]> {
+    const rows = this.db
+      .prepare("SELECT * FROM users ORDER BY createdAt DESC")
+      .all() as Record<string, unknown>[];
+    return rows.map((r) => this.toUser(r));
+  }
+
+  async upsert(user: User): Promise<User> {
+    const email = user.email.toLowerCase();
+    this.db.prepare("DELETE FROM users WHERE LOWER(email) = LOWER(?) AND id != ?").run(email, user.id);
+    this.db
+      .prepare(
+        `INSERT INTO users (id, name, email, passwordHash, role, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           email = excluded.email,
+           passwordHash = excluded.passwordHash,
+           role = excluded.role,
+           createdAt = excluded.createdAt`
+      )
+      .run(user.id, user.name, email, user.passwordHash, user.role, user.createdAt);
+    return { ...user, email };
+  }
+
   async updateRole(id: string, role: Role): Promise<PublicUser | undefined> {
     this.db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, id);
     const user = await this.findById(id);

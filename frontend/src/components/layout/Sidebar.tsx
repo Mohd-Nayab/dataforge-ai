@@ -4,7 +4,9 @@ import {
   Brain,
   Database,
   FileText,
+  GitMerge,
   LayoutDashboard,
+  Lightbulb,
   ScanSearch,
   Sparkles,
   Table2,
@@ -29,6 +31,8 @@ const NAV: { to: string; label: string; icon: React.ComponentType<{ className?: 
   { to: "/profiling", label: "Profiling", icon: ScanSearch },
   { to: "/cleaning", label: "Cleaning Studio", icon: Wand2 },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/insights", label: "Auto Insights", icon: Lightbulb },
+  { to: "/join", label: "Dataset Join", icon: GitMerge },
   { to: "/ml", label: "ML Studio", icon: Brain },
   { to: "/sql", label: "SQL Workspace", icon: Terminal },
   { to: "/report", label: "Report Builder", icon: FileText },
@@ -76,9 +80,9 @@ export default function Sidebar() {
       </nav>
 
       <div className="glass mt-4 p-3 text-xs text-slate-400">
-        <p className="font-semibold text-slate-200">Phase 1 · Core</p>
+        <p className="font-semibold text-slate-200">Production ready</p>
         <p className="mt-1 leading-relaxed">
-          ML, Forecasting, SQL & Reports arrive in the next phase.
+          Upload, clean, profile, analyze, SQL, ML, forecast & reports.
         </p>
       </div>
     </aside>

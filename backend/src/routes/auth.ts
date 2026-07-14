@@ -10,7 +10,7 @@ export const authRouter = Router();
 const registerSchema = z.object({
   name: z.string().min(1).max(80),
   email: z.string().email(),
-  password: z.string().min(6).max(128),
+  password: z.string().min(8).max(128),
 });
 
 const loginSchema = z.object({
@@ -24,7 +24,7 @@ const updateProfileSchema = z.object({
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(6).max(128),
+  newPassword: z.string().min(8).max(128),
 });
 
 authRouter.post("/register", async (req, res) => {

@@ -95,6 +95,31 @@ export class PostgresUserRepository implements UserRepository {
     return rows.map((r) => this.toPublic(this.toUser(r)));
   }
 
+  async listAll(): Promise<User[]> {
+    const { rows } = await this.pool.query("SELECT * FROM users ORDER BY createdAt DESC");
+    return rows.map((r) => this.toUser(r));
+  }
+
+  async upsert(user: User): Promise<User> {
+    const email = user.email.toLowerCase();
+    await this.pool.query("DELETE FROM users WHERE LOWER(email) = LOWER($1) AND id != $2", [
+      email,
+      user.id,
+    ]);
+    await this.pool.query(
+      `INSERT INTO users (id, name, email, passwordHash, role, createdAt)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name,
+         email = EXCLUDED.email,
+         passwordHash = EXCLUDED.passwordHash,
+         role = EXCLUDED.role,
+         createdAt = EXCLUDED.createdAt`,
+      [user.id, user.name, email, user.passwordHash, user.role, user.createdAt]
+    );
+    return { ...user, email };
+  }
+
   async updateRole(id: string, role: Role): Promise<PublicUser | undefined> {
     await this.pool.query("UPDATE users SET role = $1 WHERE id = $2", [role, id]);
     const user = await this.findById(id);

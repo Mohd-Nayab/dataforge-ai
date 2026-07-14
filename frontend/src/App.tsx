@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import AppLayout from "@/components/layout/AppLayout";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import AICChat from "@/pages/AIChat";
 import Admin from "@/pages/Admin";
 import Analytics from "@/pages/Analytics";
@@ -10,6 +11,8 @@ import CleaningStudio from "@/pages/CleaningStudio";
 import Dashboard from "@/pages/Dashboard";
 import Datasets from "@/pages/Datasets";
 import Forecast from "@/pages/Forecast";
+import Insights from "@/pages/Insights";
+import Join from "@/pages/Join";
 import Login from "@/pages/Login";
 import MLStudio from "@/pages/MLStudio";
 import Preview from "@/pages/Preview";
@@ -44,33 +47,37 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route
-        path="/"
-        element={
-          <RequireAuth>
-            <AppLayout />
-          </RequireAuth>
-        }
-      >
-        <Route index element={<Dashboard />} />
-        <Route path="upload" element={<Upload />} />
-        <Route path="datasets" element={<Datasets />} />
-        <Route path="preview" element={<Preview />} />
-        <Route path="profiling" element={<Profiling />} />
-        <Route path="cleaning" element={<CleaningStudio />} />
-        <Route path="analytics" element={<Analytics />} />
-        <Route path="sql" element={<SQLWorkspace />} />
-        <Route path="ml" element={<MLStudio />} />
-        <Route path="report" element={<Report />} />
-        <Route path="forecast" element={<Forecast />} />
-        <Route path="admin" element={<Admin />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="chat" element={<AICChat />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <AppLayout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="upload" element={<Upload />} />
+          <Route path="datasets" element={<Datasets />} />
+          <Route path="preview" element={<Preview />} />
+          <Route path="profiling" element={<Profiling />} />
+          <Route path="cleaning" element={<CleaningStudio />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="insights" element={<Insights />} />
+          <Route path="join" element={<Join />} />
+          <Route path="sql" element={<SQLWorkspace />} />
+          <Route path="ml" element={<MLStudio />} />
+          <Route path="report" element={<Report />} />
+          <Route path="forecast" element={<Forecast />} />
+          <Route path="admin" element={<Admin />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="chat" element={<AICChat />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }

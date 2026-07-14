@@ -2,18 +2,27 @@ import axios from "axios";
 
 import type {
   ChatResponse,
+  ClusterResponse,
   DatabaseConfig,
   DatasetMeta,
+  EnterpriseProfileResponse,
+  EnterpriseValidationReport,
   ForecastRequest,
   ForecastResponse,
+  FuzzyDuplicateResult,
+  InsightsResponse,
+  JoinRequest,
+  JoinResponse,
   MLModel,
   MLTrainRequest,
   MLTrainResponse,
   MLPredictResponse,
+  OutlierReportResponse,
   OverviewResponse,
   PreviewResponse,
   ProfileResponse,
   ReportResponse,
+  SmartCleanResult,
   SqlResponse,
   User,
   ValidationIssue,
@@ -30,6 +39,37 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      const token = localStorage.getItem("df_token");
+      if (token) {
+        localStorage.removeItem("df_token");
+        if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
+          window.location.href = "/login";
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function _triggerBlobDownload(res: any, fallbackName: string) {
+  const cd: string = res.headers?.["content-disposition"] || "";
+  const match = cd.match(/filename="?([^"]+)"?/);
+  const filename = match?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(res.data);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 // ----------------------------------------------------------------- auth
 export const authApi = {
@@ -74,11 +114,22 @@ export const authApi = {
     const { data } = await api.get<DatabaseConfig>("/admin/database");
     return data;
   },
-  async switchDatabase(type: DatabaseConfig["type"], url: string) {
-    const { data } = await api.post<{ message: string; type: DatabaseConfig["type"] }>(
-      "/admin/database",
-      { type, url }
-    );
+  async switchDatabase(
+    type: DatabaseConfig["type"],
+    url: string,
+    options: { migrate?: boolean } = {}
+  ) {
+    const { data } = await api.post<{
+      message: string;
+      type: DatabaseConfig["type"];
+      migrated: boolean;
+      usersMigrated: number;
+      metaMigrated: number;
+    }>("/admin/database", {
+      type,
+      url,
+      migrate: options.migrate !== false,
+    });
     return data;
   },
 };
@@ -121,6 +172,8 @@ export const dataApi = {
   },
   async remove(id: string) {
     await api.delete(`${D}/datasets/${id}`);
+    // Best-effort cleanup of Node-side metadata mirror.
+    await api.delete(`/datasets/meta/${id}`).catch(() => undefined);
   },
   async undo(id: string) {
     const { data } = await api.post<DatasetMeta>(`${D}/datasets/${id}/undo`);
@@ -145,6 +198,10 @@ export const dataApi = {
     const { data } = await api.get<ProfileResponse>(`${D}/datasets/${id}/stats`);
     return data;
   },
+  async enterpriseProfile(id: string) {
+    const { data } = await api.get<EnterpriseProfileResponse>(`${D}/datasets/${id}/profile`);
+    return data;
+  },
   async validate(id: string) {
     const { data } = await api.get<{ issues: ValidationIssue[] }>(
       `${D}/datasets/${id}/validate`
@@ -155,6 +212,37 @@ export const dataApi = {
     const { data } = await api.post<{ message: string; meta: DatasetMeta }>(
       `${D}/datasets/${id}/clean`,
       { operation, params }
+    );
+    return data;
+  },
+  async smartClean(id: string, dryRun = false) {
+    const { data } = await api.post<SmartCleanResult>(
+      `${D}/datasets/${id}/smart-clean`,
+      { dry_run: dryRun }
+    );
+    return data;
+  },
+  async getAuditLog(id: string) {
+    const { data } = await api.get<{ audit_log: SmartCleanResult["audit_log"] }>(
+      `${D}/datasets/${id}/audit-log`
+    );
+    return data.audit_log;
+  },
+  async enterpriseValidate(id: string) {
+    const { data } = await api.get<EnterpriseValidationReport>(
+      `${D}/datasets/${id}/enterprise-validate`
+    );
+    return data;
+  },
+  async fuzzyDuplicates(id: string, threshold = 0.85) {
+    const { data } = await api.get<FuzzyDuplicateResult>(
+      `${D}/datasets/${id}/fuzzy-duplicates`, { params: { threshold } }
+    );
+    return data;
+  },
+  async outlierReport(id: string) {
+    const { data } = await api.get<OutlierReportResponse>(
+      `${D}/datasets/${id}/outlier-report`
     );
     return data;
   },
@@ -204,27 +292,45 @@ export const dataApi = {
   reportUrl(id: string) {
     return `${API_BASE}${D}/datasets/${id}/report/download`;
   },
-  downloadReport(id: string) {
-    const a = document.createElement("a");
-    a.href = this.reportUrl(id);
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  async downloadReport(id: string) {
+    const res = await api.get(this.reportUrl(id), { responseType: "blob" });
+    _triggerBlobDownload(res, "report.html");
   },
   async forecast(id: string, body: ForecastRequest): Promise<ForecastResponse> {
     const { data } = await api.post<ForecastResponse>(`${D}/datasets/${id}/forecast`, body);
     return data;
   },
+  async insights(id: string, maxInsights = 12): Promise<InsightsResponse> {
+    const { data } = await api.get<InsightsResponse>(`${D}/datasets/${id}/insights`, {
+      params: { max_insights: maxInsights },
+    });
+    return data;
+  },
+  async join(id: string, body: JoinRequest): Promise<JoinResponse> {
+    const { data } = await api.post<JoinResponse>(`${D}/datasets/${id}/join`, body);
+    return data;
+  },
+  async cluster(
+    id: string,
+    body: { features?: string[]; n_clusters?: number; apply?: boolean }
+  ): Promise<ClusterResponse> {
+    const { data } = await api.post<ClusterResponse>(`${D}/datasets/${id}/ml/cluster`, body);
+    return data;
+  },
   exportUrl(id: string, format: "csv" | "json" | "xlsx") {
     return `${API_BASE}${D}/datasets/${id}/export?format=${format}`;
   },
-  download(id: string, format: "csv" | "json" | "xlsx") {
-    const a = document.createElement("a");
-    a.href = this.exportUrl(id, format);
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  async download(id: string, format: "csv" | "json" | "xlsx") {
+    const res = await api.get(this.exportUrl(id, format), { responseType: "blob" });
+    const ext = format === "xlsx" ? "xlsx" : format;
+    _triggerBlobDownload(res, `dataset.${ext}`);
+  },
+  enterpriseReportUrl(id: string, format: "html" | "xlsx") {
+    return `${API_BASE}${D}/datasets/${id}/enterprise-report/download?format=${format}`;
+  },
+  async downloadEnterpriseReport(id: string, format: "html" | "xlsx") {
+    const res = await api.get(this.enterpriseReportUrl(id, format), { responseType: "blob" });
+    const ext = format === "xlsx" ? "xlsx" : "html";
+    _triggerBlobDownload(res, `enterprise_report.${ext}`);
   },
 };
