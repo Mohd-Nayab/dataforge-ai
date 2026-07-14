@@ -50,7 +50,12 @@ export default function Admin() {
   }, [dbConfig]);
 
   const requiresUrl = selectedDb === "postgres" || selectedDb === "mongodb";
-  const isCurrent = dbConfig?.type === selectedDb;
+  const sameType = dbConfig?.type === selectedDb;
+  const sameUrl =
+    (dbUrl.trim() || "") === ((dbConfig?.url ?? "").trim() || "");
+  // For json/sqlite, empty URL means default path — treat as same target when type matches.
+  // For postgres/mongodb, allow switch when URL differs even if type is unchanged.
+  const isCurrent = sameType && (requiresUrl ? sameUrl || dbUrl.trim().length === 0 : true);
   const canSwitch = !isCurrent && (!requiresUrl || dbUrl.trim().length > 0);
 
   const updateRole = useMutation({
@@ -60,13 +65,21 @@ export default function Admin() {
   });
 
   const switchDb = useMutation({
-    mutationFn: () => authApi.switchDatabase(selectedDb, dbUrl, { migrate: migrateUsers }),
+    mutationFn: () => authApi.switchDatabase(selectedDb, dbUrl.trim(), { migrate: migrateUsers }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "database"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      setDbUrl("");
       toast.success(res.message);
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Failed to switch database"),
+    onError: (e: any) => {
+      const msg =
+        e?.response?.data?.error ??
+        e?.response?.data?.detail ??
+        e?.message ??
+        "Failed to switch database";
+      toast.error(typeof msg === "string" ? msg : "Failed to switch database");
+    },
   });
 
   if (!isAdmin) {
@@ -170,15 +183,23 @@ export default function Admin() {
             {switchDb.isPending ? "Switching…" : "Switch Database"}
           </button>
           {dbConfig && (
-            <span className="text-xs text-slate-500">
+            <span classNam<strong className="text-slate-300">e="text-xs text-slate-5</strong>0
+0          Choose notheropton (.g. SQLite / PostgSQL / MogoDB) oenlS Database
               Current: <strong className="text-slate-300">{DB_LABELS[dbConfig.type]}</strong>
             </span>
           )}
         </div>
-
+. Without a URL the button
+            stays disabled
         {isCurrent && (
           <p className="mt-3 text-xs text-slate-500">
-            Already using {DB_LABELS[selectedDb]}. Pick a different database to switch.
+         !isCurrent && !requiresUrl && (
+          <p clas Name="mt-3 text-xs text-slate-500">
+            Ready to s  Alr to {eB_LABELS[selectedDa]}d Clyck <strong>Switch Databa e</strong> and
+            confirm.
+          </p>
+        )}
+        {switchDb.isusing {DB_LABELS[selectedDb]}. Pick a different database to switch.
           </p>
         )}
         {!isCurrent && requiresUrl && dbUrl.trim().length === 0 && (
@@ -189,7 +210,8 @@ export default function Admin() {
         {switchDb.isError && (
           <p className="mt-3 text-xs text-red-400">
             {(switchDb.error as { response?: { data?: { error?: string } } })?.response?.data
-              ?.error ??
+              ?.error ??{" "}
+            Selection is saved and kept after backend restart.
               (switchDb.error as Error)?.message ??
               "Failed to switch database"}
           </p>

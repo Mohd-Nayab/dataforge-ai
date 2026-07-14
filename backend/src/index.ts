@@ -5,11 +5,11 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import { config } from "./config.js";
+import { config, persistDatabaseConfig, type DatabaseType } from "./config.js";
 import { authenticate, requireRole } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
 import { dataProxy } from "./routes/dataProxy.js";
-import { type DatabaseType, createUserRepository } from "./db/index.js";
+import { createUserRepository } from "./db/index.js";
 import { createDatasetRepository, type DatasetMeta } from "./db/datasets.js";
 import { datasetStore } from "./store/datasets.js";
 import { type Role, toPublic, userStore } from "./store/users.js";
@@ -88,13 +88,20 @@ app.post(
   express.json({ limit: "1mb" }),
   async (req, res) => {
     const type = req.body.type as DatabaseType;
-    const url = (req.body.url as string) ?? "";
+    const url = String(req.body.url ?? "").trim();
     const migrate = req.body.migrate !== false; // default: migrate users + dataset meta
     if (!type || !["json", "sqlite", "postgres", "mongodb"].includes(type)) {
       return res.status(400).json({ error: "Invalid database type" });
     }
-    if (type === config.databaseType && (url || "") === (config.databaseUrl || "")) {
-      return res.status(400).json({ error: "Already using this database" });
+    if ((type === "postgres" || type === "mongodb") && !url) {
+      return res.status(400).json({
+        error: `Connection URL is required for ${type}`,
+      });
+    }
+    if (type === config.databaseType && url === (config.databaseUrl || "")) {
+      return res.status(400).json({
+        error: "Already using this database. Choose a different type or URL.",
+      });
     }
 
     try {
@@ -122,9 +129,8 @@ app.post(
 
       userStore.setRepo(newUserRepo);
       datasetStore.setRepo(newDatasetRepo);
-      // Keep runtime config in sync so subsequent /admin/database reads are accurate.
-      config.databaseType = type;
-      config.databaseUrl = url ?? "";
+      // Persist selection so restarts keep the chosen database.
+      persistDatabaseConfig(type, url);
       return res.json({
         message: migrate
           ? `Database switched successfully. Migrated ${usersMigrated} user(s) and ${metaMigrated} dataset meta record(s).`

@@ -26,6 +26,8 @@ backend/build/
 backend/data/
 python-service/data/
 backend/users.json
+backend/data/runtime-db.json
+**/runtime-db.json
 *.joblib
 *.log
 *.sqlite
