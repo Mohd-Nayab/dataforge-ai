@@ -197,6 +197,10 @@ export const databaseApi = {
     const { data } = await api.post<QueryResult<T>>("/database/query", plan);
     return data;
   },
+  async insert(target: string, docs: Record<string, unknown>[]): Promise<{ inserted: number }> {
+    const { data } = await api.post<{ inserted: number }>("/database/insert", { target, docs });
+    return data;
+  },
 };
 
 // ----------------------------------------------------------------- data

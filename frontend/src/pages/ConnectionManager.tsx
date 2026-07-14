@@ -159,8 +159,26 @@ export default function ConnectionManager() {
     onError: (e: any) => toast.error(e?.response?.data?.error ?? "Delete failed"),
   });
 
+  const [queryError, setQueryError] = useState<string | null>(null);
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const target = queryTarget || "demo_vectors";
+      setQueryTarget(target);
+      const docs = [
+        { id: "a", text: "apple pie recipe", category: "food", embedding: [1.0, 0.2, 0.1] },
+        { id: "b", text: "banana bread", category: "food", embedding: [0.9, 0.3, 0.1] },
+        { id: "c", text: "car engine repair", category: "auto", embedding: [0.1, 0.8, 0.9] },
+      ];
+      return databaseApi.insert(target, docs);
+    },
+    onSuccess: (res) => toast.success(`Seeded ${res.inserted} vectors`),
+    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Seed failed"),
+  });
+
   const queryMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      setQueryError(null);
       const plan: import("@/lib/types").QueryPlan = { mode: queryMode };
       if (queryMode === "sql") {
         plan.sql = query;
@@ -183,7 +201,12 @@ export default function ConnectionManager() {
       }
       return databaseApi.executeQuery(plan);
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error ?? "Query failed"),
+    onError: (e: any) => {
+      const msg = e?.response?.data?.error ?? e?.message ?? "Query failed";
+      console.error("Query runner error:", e);
+      setQueryError(msg);
+      toast.error(msg);
+    },
   });
 
   function buildBody(state: ProfileFormState): Partial<ConnectionProfile> {
@@ -597,14 +620,35 @@ export default function ConnectionManager() {
               placeholder="[0.1, 0.2, 0.3]"
             />
           )}
-          <button
-            onClick={() => queryMutation.mutate()}
-            disabled={queryMutation.isPending}
-            className="btn-primary mt-3"
-          >
-            {queryMutation.isPending ? "Running…" : "Run Query"}
-          </button>
-          {queryMutation.data && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => queryMutation.mutate()}
+              disabled={queryMutation.isPending}
+              className="btn-primary"
+            >
+              {queryMutation.isPending ? "Running…" : "Run Query"}
+            </button>
+            {queryMode === "vector" && (
+              <button
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+                className="rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+              >
+                {seedMutation.isPending ? "Seeding…" : "Seed sample vectors"}
+              </button>
+            )}
+          </div>
+          {queryError && (
+            <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+              {queryError}
+            </div>
+          )}
+          {queryMutation.data && queryMutation.data.rows.length === 0 && (
+            <div className="mt-4 rounded-lg border border-slate-700/50 bg-slate-800/30 p-3 text-sm text-slate-400">
+              Query executed successfully but returned no rows.
+            </div>
+          )}
+          {queryMutation.data && queryMutation.data.rows.length > 0 && (
             <div className="mt-4 overflow-x-auto rounded-lg border border-slate-800">
               <table className="w-full border-collapse text-sm">
                 <thead className="bg-slate-900/80">

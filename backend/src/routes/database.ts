@@ -165,4 +165,23 @@ databaseRouter.post("/query", async (req, res) => {
   }
 });
 
+/** Insert documents / vectors into a collection/table on the active connection. */
+const insertSchema = z.object({
+  target: z.string().min(1),
+  docs: z.array(z.record(z.unknown())),
+});
+
+databaseRouter.post("/insert", async (req, res) => {
+  const parsed = insertSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid insert payload" });
+  }
+  try {
+    const count = await databaseManager.insert(parsed.data.target, parsed.data.docs);
+    return res.json({ inserted: count });
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : "Insert failed" });
+  }
+});
+
 export type { SupportedDatabase };
