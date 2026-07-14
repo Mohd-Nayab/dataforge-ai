@@ -1,8 +1,12 @@
 import axios from "axios";
 
 import type {
+  AdapterDescriptor,
   ChatResponse,
   ClusterResponse,
+  ConnectionProfile,
+  ConnectionProfilePublic,
+  ConnectionTestResult,
   DatabaseConfig,
   DatasetMeta,
   EnterpriseProfileResponse,
@@ -13,6 +17,7 @@ import type {
   InsightsResponse,
   JoinRequest,
   JoinResponse,
+  ManagerStatus,
   MLModel,
   MLTrainRequest,
   MLTrainResponse,
@@ -21,7 +26,9 @@ import type {
   OverviewResponse,
   PreviewResponse,
   ProfileResponse,
+  QueryResult,
   ReportResponse,
+  SchemaSnapshot,
   SmartCleanResult,
   SqlResponse,
   User,
@@ -130,6 +137,63 @@ export const authApi = {
       url,
       migrate: options.migrate !== false,
     });
+    return data;
+  },
+};
+
+// ---------------------------------------------------------- database platform
+export const databaseApi = {
+  async getSupported(): Promise<{ databases: AdapterDescriptor[] }> {
+    const { data } = await api.get<{ databases: AdapterDescriptor[] }>("/database/supported");
+    return data;
+  },
+  async getStatus(): Promise<ManagerStatus> {
+    const { data } = await api.get<ManagerStatus>("/database/status");
+    return data;
+  },
+  async listProfiles(): Promise<{ profiles: ConnectionProfilePublic[]; activeId: string | null }> {
+    const { data } = await api.get<{ profiles: ConnectionProfilePublic[]; activeId: string | null }>(
+      "/database/profiles"
+    );
+    return data;
+  },
+  async createProfile(body: Partial<ConnectionProfile>): Promise<ConnectionProfilePublic> {
+    const { data } = await api.post<{ profile: ConnectionProfilePublic }>("/database/profiles", body);
+    return data.profile;
+  },
+  async updateProfile(
+    id: string,
+    body: Partial<ConnectionProfile>
+  ): Promise<ConnectionProfilePublic> {
+    const { data } = await api.patch<{ profile: ConnectionProfilePublic }>(`/database/profiles/${id}`, body);
+    return data.profile;
+  },
+  async deleteProfile(id: string): Promise<void> {
+    await api.delete(`/database/profiles/${id}`);
+  },
+  async testProfile(
+    id?: string,
+    body?: Partial<ConnectionProfile>
+  ): Promise<ConnectionTestResult> {
+    const { data } = await api.post<ConnectionTestResult>("/database/test", body ?? {}, {
+      params: id ? { id } : undefined,
+    });
+    return data;
+  },
+  async switchTo(id: string): Promise<{ message: string; status: ManagerStatus }> {
+    const { data } = await api.post<{ message: string; status: ManagerStatus }>(`/database/switch/${id}`);
+    return data;
+  },
+  async disconnect(): Promise<{ status: ManagerStatus }> {
+    const { data } = await api.post<{ status: ManagerStatus }>("/database/disconnect");
+    return data;
+  },
+  async discoverSchema(): Promise<SchemaSnapshot> {
+    const { data } = await api.get<SchemaSnapshot>("/database/schema");
+    return data;
+  },
+  async executeQuery<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<QueryResult<T>> {
+    const { data } = await api.post<QueryResult<T>>("/database/query", { sql, params });
     return data;
   },
 };

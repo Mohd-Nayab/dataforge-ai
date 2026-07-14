@@ -8,7 +8,9 @@ import morgan from "morgan";
 import { config, persistDatabaseConfig, type DatabaseType } from "./config.js";
 import { authenticate, requireRole } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
+import { databaseRouter } from "./routes/database.js";
 import { dataProxy } from "./routes/dataProxy.js";
+import { databaseManager } from "./database/index.js";
 import { createUserRepository } from "./db/index.js";
 import { createDatasetRepository, type DatasetMeta } from "./db/datasets.js";
 import { datasetStore } from "./store/datasets.js";
@@ -18,6 +20,8 @@ const app = express();
 
 await userStore.init();
 await datasetStore.init();
+// Reconnect to the last active universal-platform database, if any.
+await databaseManager.restoreActive().catch(() => undefined);
 
 if (config.jwtSecret === "change-me-in-production") {
   console.warn(
@@ -50,6 +54,9 @@ app.get("/health", (_req, res) => {
 
 // Auth routes (JSON body parsing only applied here so multipart proxy is untouched).
 app.use("/api/auth", express.json({ limit: "1mb" }), authRouter);
+
+// Universal multi-database platform (connection manager + switcher + schema).
+app.use("/api/database", express.json({ limit: "1mb" }), databaseRouter);
 
 // Admin: list users and update roles.
 app.get("/api/admin/users", authenticate, requireRole("admin"), async (_req, res) => {

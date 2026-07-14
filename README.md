@@ -32,6 +32,7 @@ Everything runs **end-to-end**:
 - Analytics charts (histogram, bar, correlation matrix) via Recharts
 - AI Chat assistant (rule-based NL → operation router, optional Ollama backend)
 - **Export** the (cleaned) dataset to **CSV / Excel (.xlsx) / JSON** from Preview, Profiling, or the Cleaning Studio
+- **Universal Database Platform — Phase 1 core**: database-agnostic `DatabaseAdapter` interface, AES-256-GCM encrypted connection profiles, adapter registry (SQLite, PostgreSQL, MongoDB available; MySQL/MariaDB/SQL Server/Oracle/Redis/Elasticsearch/VectorDBs declared), `DatabaseManager` with connection pooling, testing, switching, and reconnection. Backend routes for profile CRUD, connection testing, one-click database switching, schema discovery, and unified query execution. Frontend **Connections** page to manage profiles, switch active databases, and run queries without code changes or restarts.
 
 Later phases layer on the full page set.
 
@@ -202,6 +203,63 @@ To demo the MongoDB adapter, create a free cluster and paste its URL into the Ad
 6. In the app: **Admin** → **Database Connection** → choose **MongoDB**, paste the URL, click **Switch Database**.
 
 The adapter uses the `dataforge` database and a `users` collection (created automatically). To make MongoDB the default across restarts, set `DATABASE_TYPE=mongodb` and `DATABASE_URL=<your Atlas URL>` in the backend environment.
+
+## Universal Database Platform Architecture
+
+`backend/src/database` is designed as an adapter-based, multi-engine platform:
+
+```
+backend/src/database/
+├── core/
+│   ├── types.ts          # DatabaseAdapter interface, profile types, capabilities
+│   ├── crypto.ts         # AES-256-GCM credential encryption
+│   ├── profiles.ts       # Encrypted on-disk profile store (CRUD)
+│   ├── registry.ts       # Adapter registry / plugin catalog
+│   └── DatabaseManager.ts# Pooling, switching, reconnect, unified API
+├── adapters/
+│   ├── sqlite.ts
+│   ├── postgres.ts
+│   └── mongodb.ts
+└── index.ts              # Barrel + adapter registration
+```
+
+### How to add a new adapter
+
+1. **Implement the interface** in `backend/src/database/adapters/<engine>.ts`:
+
+```typescript
+import type { DatabaseAdapter, ConnectionProfile, QueryResult } from "../core/types";
+
+export const myAdapter: DatabaseAdapter = {
+  type: "mysql",
+  capabilities: { family: "relational", sql: true, documents: false, transactions: true, indexes: true, vectorSearch: false },
+  async connect(profile) { /* return connection */ },
+  async disconnect() {},
+  async ping(conn) { return { ok: true, latencyMs: 0 }; },
+  async executeQuery(conn, sql, params) { return { rows: [], rowCount: 0 }; },
+  async find(conn, collection, query) { throw new Error("not implemented"); },
+  async insert(conn, collection, doc) { throw new Error("not implemented"); },
+  async update(conn, collection, query, update) { throw new Error("not implemented"); },
+  async delete(conn, collection, query) { throw new Error("not implemented"); },
+  async listSchemas(conn) { return []; },
+  async transaction(conn, fn) { return fn(conn); },
+};
+```
+
+2. **Register it** in `backend/src/database/index.ts`:
+
+```typescript
+import { myAdapter } from "./adapters/<engine>";
+DatabaseManager.registry.register(myAdapter);
+```
+
+3. **(Optional)** If the new engine is the default backend store, add a migration strategy in the legacy `/admin/database` switch route.
+
+### Security
+
+- Credentials inside `ConnectionProfile` are encrypted with **AES-256-GCM** before being written to disk (`backend/data/profiles.json`).
+- The key is derived from `JWT_SECRET` or `APP_SECRET`; generate a strong secret in production.
+- The raw password is only sent from the client during create/update; the API never returns it.
 
 ## License
 

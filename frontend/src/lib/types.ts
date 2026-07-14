@@ -366,3 +366,97 @@ export interface ClusterResponse {
   sample_labels: number[];
   meta?: DatasetMeta;
 }
+
+// ----------------------------------------------------------------- Database Platform
+
+export type SupportedDatabase =
+  | "sqlite"
+  | "postgres"
+  | "mysql"
+  | "mariadb"
+  | "sqlserver"
+  | "oracle"
+  | "mongodb"
+  | "redis"
+  | "elasticsearch"
+  | "pinecone"
+  | "chromadb"
+  | "weaviate"
+  | "qdrant"
+  | "milvus"
+  | "faiss";
+
+export type DatabaseFamily = "relational" | "document" | "key_value" | "search" | "vector";
+
+export interface DatabaseCapabilities {
+  family: DatabaseFamily;
+  sql: boolean;
+  documents: boolean;
+  transactions: boolean;
+  indexes: boolean;
+  vectorSearch: boolean;
+}
+
+export interface AdapterDescriptor {
+  type: SupportedDatabase;
+  label: string;
+  capabilities: DatabaseCapabilities;
+  status: "available" | "planned";
+  requiredFields: ("host" | "port" | "username" | "password" | "database" | "options")[];
+  defaultPort?: number;
+}
+
+export interface ConnectionProfile {
+  id: string;
+  name: string;
+  type: SupportedDatabase;
+  host?: string;
+  port?: number;
+  username?: string;
+  /** Sent only in create/update requests, never returned. */
+  password?: string;
+  database?: string;
+  ssl?: boolean;
+  authMethod?: string;
+  options?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectionProfilePublic extends Omit<ConnectionProfile, "password"> {
+  hasPassword: boolean;
+}
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  latencyMs: number;
+  message: string;
+  serverInfo?: Record<string, unknown>;
+}
+
+export interface SchemaObject {
+  name: string;
+  type: "table" | "view" | "collection" | "index";
+  columns?: { name: string; dataType: string; nullable?: boolean }[];
+  rowCount?: number;
+}
+
+export interface SchemaSnapshot {
+  database?: string;
+  objects: SchemaObject[];
+  discoveredAt: string;
+}
+
+export interface ManagerStatus {
+  activeProfileId: string | null;
+  activeType: SupportedDatabase | null;
+  connected: boolean;
+  pooledProfiles: string[];
+}
+
+export interface QueryResult<T = Record<string, unknown>> {
+  rows: T[];
+  rowCount: number;
+  fields?: string[];
+  raw?: unknown;
+}

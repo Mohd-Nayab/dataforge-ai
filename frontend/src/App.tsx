@@ -6,6 +6,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import AICChat from "@/pages/AIChat";
 import Admin from "@/pages/Admin";
 import Analytics from "@/pages/Analytics";
+import ConnectionManager from "@/pages/ConnectionManager";
 import Profile from "@/pages/Profile";
 import CleaningStudio from "@/pages/CleaningStudio";
 import Dashboard from "@/pages/Dashboard";
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="insights" element={<Insights />} />
           <Route path="join" element={<Join />} />
+          <Route path="connections" element={<ConnectionManager />} />
           <Route path="sql" element={<SQLWorkspace />} />
           <Route path="ml" element={<MLStudio />} />
           <Route path="report" element={<Report />} />
