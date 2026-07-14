@@ -206,15 +206,15 @@ The adapter uses the `dataforge` database and a `users` collection (created auto
 
 ### ChromaDB setup (local vector DB)
 
-To use the ChromaDB vector adapter locally, start a Chroma server and switch the active database to **ChromaDB**.
+To use the ChromaDB vector adapter locally, start a Chroma server and switch the active database to **ChromaDB**. You can use any free port — the examples below use `8010` in case `8000` is already taken.
 
 1. Run Chroma with Docker:
    ```bash
-   docker run -d -p 8000:8000 chromadb/chroma:latest
+   docker run -d -p 8010:8000 chromadb/chroma:latest
    ```
-   Or use Python: `pip install chromadb && chroma run --host localhost --port 8000`
-2. In the app: **Admin** → **Database Connection** → choose **ChromaDB**, enter host `localhost` and port `8000`, then click **Switch Database**.
-3. To make ChromaDB the default across restarts, set `DATABASE_TYPE=chromadb` and `DATABASE_URL=http://localhost:8000` in your environment.
+   Or use Python: `pip install chromadb && chroma run --host localhost --port 8010`
+2. In the app: **Admin** → **Database Connection** → choose **ChromaDB**, enter host `localhost` and port `8010`, then click **Switch Database**.
+3. To make ChromaDB the default across restarts, set `DATABASE_TYPE=chromadb` and `DATABASE_URL=http://localhost:8010` in your environment.
 
 Collections are created on demand. Use the **Vector** mode in the query runner to run similarity searches over embeddings.
 
